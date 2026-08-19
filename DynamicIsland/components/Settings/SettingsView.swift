@@ -711,6 +711,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .general, title: "Enable haptics", keywords: ["haptic", "feedback"], highlightID: SettingsTab.general.highlightID(for: "Enable haptics")),
             SettingsSearchEntry(tab: .general, title: "Open notch on hover", keywords: ["hover to open", "auto open"], highlightID: SettingsTab.general.highlightID(for: "Open notch on hover")),
             SettingsSearchEntry(tab: .general, title: "On-hover preview", keywords: ["hover preview", "minimalistic", "compact", "media preview"], highlightID: SettingsTab.general.highlightID(for: "On-hover preview")),
+            SettingsSearchEntry(tab: .general, title: "Hover preview delay", keywords: ["hover preview", "delay", "duration", "minimalistic"], highlightID: SettingsTab.general.highlightID(for: "Hover preview delay")),
             SettingsSearchEntry(tab: .general, title: "External display style", keywords: ["dynamic island", "pill", "external display", "non-notch", "floating", "capsule"], highlightID: SettingsTab.general.highlightID(for: "External display style")),
             SettingsSearchEntry(tab: .general, title: "Hide until hovered", keywords: ["hide", "hover", "external", "non-notch", "auto hide", "slide"], highlightID: SettingsTab.general.highlightID(for: "Hide until hovered")),
             SettingsSearchEntry(tab: .general, title: "Notch display height", keywords: ["display height", "menu bar size"], highlightID: SettingsTab.general.highlightID(for: "Notch display height")),
@@ -1026,6 +1027,7 @@ struct GeneralSettings: View {
     @Default(.showEmojis) var showEmojis
     @Default(.gestureSensitivity) var gestureSensitivity
     @Default(.minimumHoverDuration) var minimumHoverDuration
+    @Default(.onHoverPreviewDuration) var onHoverPreviewDuration
     @Default(.nonNotchHeight) var nonNotchHeight
     @Default(.nonNotchHeightMode) var nonNotchHeightMode
     @Default(.notchHeight) var notchHeight
@@ -1283,7 +1285,18 @@ struct GeneralSettings: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Toggle("Remember last tab", isOn: $coordinator.openLastTabByDefault)
-            if openNotchOnHover || (onHoverPreview && !enableMinimalisticUI) {
+            if onHoverPreview && !enableMinimalisticUI {
+                Slider(value: $onHoverPreviewDuration, in: 0...1, step: 0.1) {
+                    HStack {
+                        Text("Hover preview delay")
+                        Spacer()
+                        Text("\(onHoverPreviewDuration, specifier: "%.1f")s")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .settingsHighlight(id: highlightID("Hover preview delay"))
+            }
+            if openNotchOnHover {
                 Slider(value: $minimumHoverDuration, in: 0...1, step: 0.1) {
                     HStack {
                         Text("Minimum hover duration")

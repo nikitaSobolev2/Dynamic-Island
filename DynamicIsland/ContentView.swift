@@ -1796,7 +1796,10 @@ struct ContentView: View {
                 (shouldOpenHoverPreview || Defaults[.openNotchOnHover] || shouldFocusTimerTab) else { return }
 
             hoverTask = Task {
-                try? await Task.sleep(for: .seconds(Defaults[.minimumHoverDuration]))
+                let hoverDelay = shouldOpenHoverPreview
+                    ? Defaults[.onHoverPreviewDuration]
+                    : Defaults[.minimumHoverDuration]
+                try? await Task.sleep(for: .seconds(hoverDelay))
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
