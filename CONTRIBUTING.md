@@ -16,7 +16,6 @@ Thank you for your interest in contributing to Atoll! We welcome contributions f
 - [Documentation](#documentation)
 - [Releasing](#releasing)
 - [Code Review process](#code-review-process)
-- [Community & Support](#community--support)
 
 
 ---
@@ -100,11 +99,6 @@ The only repository secret required is `SPARKLE_ED_PRIVATE_KEY` (EdDSA private k
 - Automated testing must pass via continuous integration workflows.
 - Changes should not significantly decrease test coverage without justification.
 - Breaking changes require major version updates following semantic versioning.
-
-## Community & Support
-
-- Join our [Discord community](https://discord.gg/zvjB4tJBkt) for discussion, support, and collaboration.
-- Be respectful and constructive in all interactions.
 
 ---
 

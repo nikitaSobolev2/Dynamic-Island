@@ -12,25 +12,12 @@
   <a href="https://github.com/nikitaSobolev2/Dynamic-Island/releases">
     <img src="https://img.shields.io/github/downloads/nikitaSobolev2/Dynamic-Island/total?label=Downloads" alt="GitHub downloads"/>
   </a>
-  <a href="https://discord.gg/PaqFkRTDF8">
-    <img src="https://dcbadge.limes.pink/api/server/https://discord.gg/PaqFkRTDF8?style=flat" alt="Discord server"/>
-  </a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/sponsors/nikitaSobolev2">
-    <img src="https://img.shields.io/badge/Sponsor-nikitaSobolev2-ff69b4?style=for-the-badge&logo=github" alt="Sponsor nikitaSobolev2"/>
-  </a>
   <a href="https://github.com/nikitaSobolev2/Dynamic-Island/releases/latest">
     <img src="https://img.shields.io/badge/Download-Dynamic%20Island%20for%20macOS-0A84FF?style=for-the-badge&logo=apple" alt="Download Dynamic Island for macOS"/>
   </a>
-  <a href="https://www.buymeacoffee.com/kryoscopic">
-    <img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-kryoscopic-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=000000" alt="Buy Me a Coffee for kryoscopic"/>
-  </a>
-</p>
-
-<p align="center">
-  <a href="https://discord.gg/PaqFkRTDF8">Join our Discord community</a>
 </p>
 
 Atoll turns the MacBook notch into a focused command surface for media, system insight, and quick utilities. It stays out of the way until needed, then expands with responsive, native SwiftUI animations.
@@ -122,22 +109,6 @@ Select your Mac as the run destination and build (Cmd+R). Grant the requested pe
 ## License
 Atoll is released under the GPL v3 License. Refer to [LICENSE](LICENSE) for the full terms.
 
-## Acknowledgments
-
-Atoll builds upon the work of several open-source projects and draws inspiration from innovative macOS applications:
-
-- [**Boring.Notch**](https://github.com/TheBoredTeam/boring.notch) - foundational codebase that provided the initial media player integration, AirDrop surface implementation, file dock functionality, and calendar event display. Major architectural patterns and notch interaction models were adapted from this project.
-
-- [**Alcove**](https://tryalcove.com) - primary inspiration for the Minimalistic Mode interface design and the conceptual framework for lock screen widget integration that informed Atoll's compact layout strategy.
-
-- [**Stats**](https://github.com/exelban/stats) - source implementation for CPU temperature monitoring via SMC (System Management Controller) access, frequency sampling through IOReport bindings, and per-core CPU utilisation tracking. The system metrics collection architecture derives from Stats project readers.
-
-- [**Open Meteo**](https://open-meteo.com) - weather apis for the lock screen widgets
-
-- [**SkyLightWindow**](https://github.com/Lakr233/SkyLightWindow) - window rendering for Lock Screen Widgets
-
-- Wick - Thanks Nate for allowing us to replicate the iOS like Timer design for the Lock Screen Widget
-
 ## Contributors
 
 <a href="https://github.com/nikitaSobolev2/Dynamic-Island/graphs/contributors">
@@ -147,29 +118,3 @@ Atoll builds upon the work of several open-source projects and draws inspiration
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=nikitaSobolev2/Dynamic-Island&type=timeline&legend=top-left)](https://www.star-history.com/#nikitaSobolev2/Dynamic-Island&type=timeline&legend=top-left)
-
-A heartfelt thanks to [TheBoredTeam](https://github.com/TheBoredTeam) for being supportive and being totally awesome, Atoll would not have been possible without Boring.Notch
-
----
-
-<p align="center">
-  <img src=".github/assets/iosdevcentre.jpeg" alt="iOS Development Centre exterior" width="420">
-  <br>
-  <sub>Backed by</sub>
-  <br>
-  <strong>iOS Development Centre</strong>
-  <br>
-  Powered by Apple and Infosys
-  <br>
-  SRM Institute of Science and Technology, Chennai, India
-</p>
-
-<p align="center">
-  <a href="https://buymeacoffee.com/kryoscopic">
-    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="200" />
-  </a>
-</p>
-
-<p align="center">
-  Your support helps fund teaching children software development.
-</p>
