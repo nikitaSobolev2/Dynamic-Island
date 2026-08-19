@@ -714,6 +714,7 @@ extension Defaults.Keys {
     static let minimumHoverDuration = Key<TimeInterval>("minimumHoverDuration", default: 0.3)
     static let enableHaptics = Key<Bool>("enableHaptics", default: true)
     static let openNotchOnHover = Key<Bool>("openNotchOnHover", default: true)
+    static let onHoverPreview = Key<Bool>("onHoverPreview", default: false)
 	static let extendHoverArea = Key<Bool>("extendHoverArea", default: false)
     static let externalDisplayStyle = Key<ExternalDisplayStyle>(
         "externalDisplayStyle",

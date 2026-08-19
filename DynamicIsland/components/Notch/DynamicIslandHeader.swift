@@ -38,7 +38,7 @@ struct DynamicIslandHeader: View {
     
     var body: some View {
         HStack(spacing: 0) {
-            if !Defaults[.enableMinimalisticUI] {
+            if !vm.usesMinimalisticLayout {
                 HStack {
                     let shouldShowTabs = coordinator.alwaysShowTabs || vm.notchState == .open || !shelfState.items.isEmpty
                     if shouldShowTabs {
@@ -52,7 +52,7 @@ struct DynamicIslandHeader: View {
                 .zIndex(2)
             }
 
-            if vm.notchState == .open && !Defaults[.enableMinimalisticUI] {
+            if vm.notchState == .open && !vm.usesMinimalisticLayout {
                 let spacerWidth = min(vm.closedNotchSize.width, 300)
                 Rectangle()
                     .fill(NSScreen.screens
@@ -64,7 +64,7 @@ struct DynamicIslandHeader: View {
             }
 
             HStack(spacing: 4) {
-                if vm.notchState == .open && !Defaults[.enableMinimalisticUI] {
+                if vm.notchState == .open && !vm.usesMinimalisticLayout {
                     if Defaults[.showMirror] {
                         Button(action: {
                             vm.toggleCameraPreview()

@@ -108,9 +108,11 @@ class DynamicIslandViewCoordinator: ObservableObject {
     /// Direction of the most recent tab switch (true = forward/right, false = backward/left)
     @Published var tabSwitchForward: Bool = true
     
+    @Published var isHoverPreviewActive: Bool = false
+
     @Published var currentView: NotchViews = .home {
         didSet {
-            if Defaults[.enableMinimalisticUI] && currentView != .home {
+            if (Defaults[.enableMinimalisticUI] || isHoverPreviewActive) && currentView != .home {
                 currentView = .home
                 return
             }
@@ -352,6 +354,9 @@ class DynamicIslandViewCoordinator: ObservableObject {
         if !isExtensionType && !bypassedTypes.contains(type) && !Defaults[.enableSystemHUD] {
             return
         }
+        if status && isHoverPreviewActive {
+            return
+        }
         DispatchQueue.main.async {
             withAnimation(.smooth(duration: 0.3)) {
                 self.sneakPeek.show = status
@@ -400,12 +405,22 @@ class DynamicIslandViewCoordinator: ObservableObject {
         }
     }
     
+    func hideTransientNotchOverlays() {
+        sneakPeekTask?.cancel()
+        expandingViewTask?.cancel()
+        sneakPeek.show = false
+        expandingView.show = false
+    }
+
     func toggleExpandingView(
         status: Bool,
         type: SneakContentType,
         value: CGFloat = 0,
         browser: BrowserType = .chromium
     ) {
+        if status && isHoverPreviewActive {
+            return
+        }
         Task { @MainActor in
             withAnimation(.smooth) {
                 self.expandingView.show = status

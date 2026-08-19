@@ -88,7 +88,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     }
 
     private func focusClipboardTabIfNeeded() {
-        guard !Defaults[.enableMinimalisticUI] else { return }
+        guard !usesMinimalisticLayout else { return }
         guard Defaults[.enableClipboardManager] else { return }
         guard Defaults[.clipboardDisplayMode] == .separateTab else { return }
         guard let lastCopyDate = ClipboardManager.shared.lastCopiedItemDate else { return }
@@ -107,6 +107,25 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
 
     @Published var notchSize: CGSize = getClosedNotchSize()
     @Published var closedNotchSize: CGSize = getClosedNotchSize()
+    private var tabBeforeHoverPreview: NotchViews?
+
+    var usesMinimalisticLayout: Bool {
+        Defaults[.enableMinimalisticUI] || coordinator.isHoverPreviewActive
+    }
+
+    func beginHoverPreview() {
+        if !coordinator.isHoverPreviewActive {
+            tabBeforeHoverPreview = coordinator.currentView
+        }
+        coordinator.hideTransientNotchOverlays()
+        coordinator.currentView = .home
+        coordinator.isHoverPreviewActive = true
+    }
+
+    func endHoverPreviewWithoutRestoringTab() {
+        coordinator.isHoverPreviewActive = false
+        tabBeforeHoverPreview = nil
+    }
     
     @MainActor
     deinit {
@@ -126,6 +145,13 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         self.screen = screen
         notchSize = getClosedNotchSize(screen: screen)
         closedNotchSize = notchSize
+
+        coordinator.$isHoverPreviewActive
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
 
         Publishers.CombineLatest($dropZoneTargeting, $dragDetectorTargeting)
             .map { value1, value2 in
@@ -147,13 +173,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
                 withAnimation(.smooth) {
                     self.notchSize = updatedTarget
                 }
-                if let delegate = AppDelegate.shared {
-                    delegate.ensureWindowSize(
-                        addShadowPadding(to: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
-                        animated: true,
-                        force: false
-                    )
-                }
+                self.resizeOpenWindow(to: updatedTarget, animated: true, force: false)
             }
             .store(in: &cancellables)
 
@@ -166,20 +186,14 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 guard let self else { return }
-                guard Defaults[.enableMinimalisticUI] else { return }
+                guard self.usesMinimalisticLayout else { return }
                 let updatedTarget = self.calculateDynamicNotchSize()
                 guard self.notchState == .open else { return }
                 guard self.notchSize != updatedTarget else { return }
                 withAnimation(.smooth) {
                     self.notchSize = updatedTarget
                 }
-                if let delegate = AppDelegate.shared {
-                    delegate.ensureWindowSize(
-                        addShadowPadding(to: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
-                        animated: true,
-                        force: false
-                    )
-                }
+                self.resizeOpenWindow(to: updatedTarget, animated: true, force: false)
             }
             .store(in: &cancellables)
 
@@ -202,13 +216,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
                 withAnimation(.easeInOut(duration: 0.3)) {
                     self.notchSize = updatedTarget
                 }
-                if let delegate = AppDelegate.shared {
-                    delegate.ensureWindowSize(
-                        addShadowPadding(to: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
-                        animated: false,
-                        force: false
-                    )
-                }
+                self.resizeOpenWindow(to: updatedTarget, animated: false, force: false)
             }
             .store(in: &cancellables)
 
@@ -223,13 +231,7 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
                 withAnimation(.easeInOut(duration: 0.25)) {
                     self.notchSize = updatedTarget
                 }
-                if let delegate = AppDelegate.shared {
-                    delegate.ensureWindowSize(
-                        addShadowPadding(to: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
-                        animated: true,
-                        force: false
-                    )
-                }
+                self.resizeOpenWindow(to: updatedTarget, animated: true, force: false)
             }
             .store(in: &cancellables)
 
@@ -240,38 +242,34 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
             .sink { [weak self] _ in
                 guard let self else { return }
                 guard self.notchState == .open else { return }
-                guard !Defaults[.enableMinimalisticUI] else { return }
+                guard !self.usesMinimalisticLayout else { return }
                 let updatedTarget = self.calculateDynamicNotchSize()
                 guard self.notchSize != updatedTarget else { return }
                 withAnimation(.smooth) {
                     self.notchSize = updatedTarget
                 }
-                if let delegate = AppDelegate.shared {
-                    delegate.ensureWindowSize(
-                        addShadowPadding(to: updatedTarget, isMinimalistic: false),
-                        animated: true,
-                        force: false
-                    )
-                }
+                self.resizeOpenWindow(to: updatedTarget, animated: true, force: false)
             }
             .store(in: &cancellables)
     }
 
     private func handleMinimalisticTimerHeightChange() {
-        guard Defaults[.enableMinimalisticUI] else { return }
+        guard usesMinimalisticLayout else { return }
         guard notchState == .open else { return }
         let updatedTarget = calculateDynamicNotchSize()
         guard notchSize != updatedTarget else { return }
         withAnimation(.smooth) {
             notchSize = updatedTarget
         }
-        if let delegate = AppDelegate.shared {
-            delegate.ensureWindowSize(
-                addShadowPadding(to: updatedTarget, isMinimalistic: Defaults[.enableMinimalisticUI]),
-                animated: true,
-                force: false
-            )
-        }
+        resizeOpenWindow(to: updatedTarget, animated: true, force: false)
+    }
+
+    private func resizeOpenWindow(to targetSize: CGSize, animated: Bool, force: Bool) {
+        AppDelegate.shared?.ensureWindowSize(
+            addShadowPadding(to: targetSize, isMinimalistic: usesMinimalisticLayout),
+            animated: animated,
+            force: force
+        )
     }
     
     private func setupDetectorObserver() {
@@ -327,13 +325,8 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     func open() {
         let targetSize = calculateDynamicNotchSize()
 
-        let applyWindowResize: () -> Void = {
-            guard let delegate = AppDelegate.shared else { return }
-            delegate.ensureWindowSize(
-                addShadowPadding(to: targetSize, isMinimalistic: Defaults[.enableMinimalisticUI]),
-                animated: false,
-                force: true
-            )
+        let applyWindowResize: () -> Void = { [weak self] in
+            self?.resizeOpenWindow(to: targetSize, animated: false, force: true)
         }
 
         if Thread.isMainThread {
@@ -345,13 +338,24 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         notchSize = targetSize
         notchState = .open
 
+        // Hosting-view layout can run after this call and shove the panel
+        // from its origin. Recenter once SwiftUI has applied the new size.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.notchState == .open else { return }
+            self.resizeOpenWindow(
+                to: self.calculateDynamicNotchSize(),
+                animated: false,
+                force: true
+            )
+        }
+
         // Force music information update when notch is opened
         MusicManager.shared.forceUpdate()
         focusClipboardTabIfNeeded()
     }
     
     private func calculateDynamicNotchSize() -> CGSize {
-        let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize : openNotchSize
+        let baseSize = usesMinimalisticLayout ? minimalisticOpenNotchSize : openNotchSize
         var adjustedSize = baseSize
 
         if coordinator.currentView == .notes || coordinator.currentView == .clipboard {
@@ -368,6 +372,9 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     }
 
     func close() {
+        let previewTabToRestore = coordinator.isHoverPreviewActive ? tabBeforeHoverPreview : nil
+        coordinator.isHoverPreviewActive = false
+        tabBeforeHoverPreview = nil
         let targetSize = getClosedNotchSize(screen: screen)
         notchSize = targetSize
         closedNotchSize = targetSize
@@ -377,7 +384,9 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
 
         // Set the current view to shelf if it contains files and the user enables openShelfByDefault
         // Otherwise, if the user has not enabled openLastShelfByDefault, set the view to home
-        if !ShelfStateViewModel.shared.isEmpty && Defaults[.openShelfByDefault] && !Defaults[.enableMinimalisticUI] {
+        if let previewTabToRestore, coordinator.openLastTabByDefault {
+            coordinator.currentView = previewTabToRestore
+        } else if !ShelfStateViewModel.shared.isEmpty && Defaults[.openShelfByDefault] && !Defaults[.enableMinimalisticUI] {
             coordinator.currentView = .shelf
         } else if !coordinator.openLastTabByDefault {
             coordinator.currentView = .home
@@ -385,6 +394,8 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     }
 
     func closeForLockScreen() {
+        coordinator.isHoverPreviewActive = false
+        tabBeforeHoverPreview = nil
         let targetSize = getClosedNotchSize(screen: screen)
         withAnimation(.none) {
             notchSize = targetSize

@@ -81,6 +81,19 @@ struct DynamicNotchApp: App {
 }
 
 final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    required init(rootView: Content) {
+        super.init(rootView: rootView)
+        // Keep AppKit setFrame as the size authority. Intrinsic SwiftUI size
+        // otherwise grows the panel from its origin (preview 420 → full 640
+        // slides the island to the right).
+        sizingOptions = []
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         true
     }
@@ -317,8 +330,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return CGSize(width: inlineSneakPeekWidth, height: vm.effectiveClosedNotchHeight)
         }
         
-        // Use minimalistic or normal size based on settings
-        var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize : openNotchSize
+        // Use minimalistic or normal size based on settings / hover preview
+        var baseSize = vm.usesMinimalisticLayout ? minimalisticOpenNotchSize : openNotchSize
         
         // Use a consistent height for different view types
         if coordinator.currentView == .timer {
@@ -339,7 +352,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
         var result = addShadowPadding(
             to: adjustedContentSize,
-            isMinimalistic: Defaults[.enableMinimalisticUI]
+            isMinimalistic: vm.usesMinimalisticLayout
         )
 
         return result
@@ -479,6 +492,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.updateWindowSizeForTabSwitch()
             }
         }.store(in: &cancellables)
+
+        // Hover preview uses the same compact size as Minimalistic UI. Resize
+        // + recenter as soon as that flag flips, or the panel grows from its
+        // origin and the full island sits off to the right.
+        coordinator.$isHoverPreviewActive
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.updateWindowSizeIfNeeded()
+                }
+            }
+            .store(in: &cancellables)
 
         coordinator.$notesLayoutState
             .removeDuplicates()

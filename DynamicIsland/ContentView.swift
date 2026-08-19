@@ -85,7 +85,7 @@ struct ContentView: View {
     
     // Dynamic sizing based on view type and graph count with smooth transitions
     var dynamicNotchSize: CGSize {
-        let baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize : openNotchSize
+        let baseSize = vm.usesMinimalisticLayout ? minimalisticOpenNotchSize : openNotchSize
         
         // When inline sneak peek is active in closed notch, use the wider inline width
         // so the outer maxWidth frame doesn't clip the expanded content
@@ -124,7 +124,7 @@ struct ContentView: View {
             return baseSize
         }
 
-        if enableMinimalisticUI,
+        if vm.usesMinimalisticLayout,
            coordinator.currentView == .home,
            let preferredHeight = extensionMinimalisticPreferredHeight(baseSize: baseSize) {
             return CGSize(width: baseSize.width, height: preferredHeight)
@@ -235,7 +235,7 @@ struct ContentView: View {
     
     // Use minimalistic corner radius ONLY when opened, keep normal when closed
     private var activeCornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) {
-        if enableMinimalisticUI {
+        if vm.usesMinimalisticLayout {
             // Keep normal closed corner radius, use minimalistic when opened
             return (opened: minimalisticCornerRadiusInsets.opened, closed: cornerRadiusInsets.closed)
         }
@@ -243,7 +243,7 @@ struct ContentView: View {
     }
     
     private var currentShadowPadding: CGFloat {
-        notchShadowPaddingValue(isMinimalistic: enableMinimalisticUI)
+        notchShadowPaddingValue(isMinimalistic: vm.usesMinimalisticLayout)
     }
 
     private var currentNotchShape: NotchShape {
@@ -276,6 +276,7 @@ struct ContentView: View {
 
     /// Whether the global sneak peek is visible on this specific screen.
     private var isSneakPeekVisibleOnCurrentScreen: Bool {
+        guard !coordinator.isHoverPreviewActive else { return false }
         guard coordinator.sneakPeek.show else { return false }
         guard Defaults[.showOnAllDisplays] else { return true }
         guard let targetScreenName = coordinator.sneakPeek.targetScreenName else { return true }
@@ -312,7 +313,7 @@ struct ContentView: View {
     private var currentPillShape: DynamicIslandPillShape {
         let radius: CGFloat
         if vm.notchState == .open {
-            radius = enableMinimalisticUI
+            radius = vm.usesMinimalisticLayout
                 ? minimalisticCornerRadiusInsets.opened.top
                 : dynamicIslandPillCornerRadiusInsets.opened
         } else {
@@ -399,7 +400,8 @@ struct ContentView: View {
                             handleHover(hovering)
                         }
                         .onTapGesture {
-                            if vm.notchState == .closed && Defaults[.enableHaptics] {
+                            guard vm.notchState == .closed else { return }
+                            if Defaults[.enableHaptics] {
                                 triggerHapticIfAllowed()
                             }
                             openNotch()
@@ -500,7 +502,7 @@ struct ContentView: View {
                     if !sneakPeekShowing {
                         runAfter(0.2) {
                             if isHovering && vm.notchState == .closed {
-                                openNotch()
+                                openNotchForHover()
                             }
                         }
                     }
@@ -537,7 +539,7 @@ struct ContentView: View {
             maxHeight: dynamicNotchSize.height + currentShadowPadding + (isDynamicIslandMode ? dynamicIslandTopOffset : 0),
             alignment: .top
         )
-        .frame(maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .environmentObject(privacyManager)
         .onChange(of: dynamicNotchSize) { oldSize, newSize in
             guard oldSize != newSize else { return }
@@ -777,6 +779,12 @@ struct ContentView: View {
                       } else if vm.notchState == .open {
                           DynamicIslandHeader()
                               .frame(height: max(24, vm.effectiveClosedNotchHeight))
+                              .contentShape(Rectangle())
+                              .conditionalModifier(coordinator.isHoverPreviewActive) { view in
+                                  view.onTapGesture {
+                                      openNotch()
+                                  }
+                              }
                        } else {
                            Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                        }
@@ -1583,9 +1591,29 @@ struct ContentView: View {
     }
 
     // MARK: - Private Methods
+    private var shouldOpenHoverPreview: Bool {
+        Defaults[.onHoverPreview] && !enableMinimalisticUI
+    }
+
     private func openNotch() {
+        vm.endHoverPreviewWithoutRestoringTab()
         withAnimation(.bouncy.speed(1.2)) {
             vm.open()
+        }
+    }
+
+    private func openHoverPreview() {
+        vm.beginHoverPreview()
+        withAnimation(.bouncy.speed(1.2)) {
+            vm.open()
+        }
+    }
+
+    private func openNotchForHover() {
+        if shouldOpenHoverPreview {
+            openHoverPreview()
+        } else {
+            openNotch()
         }
     }
 
@@ -1605,6 +1633,22 @@ struct ContentView: View {
         )
 
         return activationRect.contains(location)
+    }
+
+    private func isClickInClosedNotchArea(_ location: NSPoint = NSEvent.mouseLocation) -> Bool {
+        guard let screen = NSScreen.screens.first(where: { $0.localizedName == currentScreenName }) else {
+            return false
+        }
+
+        let notchWidth = max(vm.closedNotchSize.width, 1)
+        let notchHeight = max(vm.effectiveClosedNotchHeight, 14)
+        let notchRect = CGRect(
+            x: screen.frame.midX - notchWidth / 2,
+            y: screen.frame.maxY - notchHeight,
+            width: notchWidth,
+            height: notchHeight
+        )
+        return notchRect.contains(location)
     }
 
     private func startHiddenEdgeHoverPolling() {
@@ -1638,8 +1682,13 @@ struct ContentView: View {
             Task { @MainActor in
                 guard let vm, let lockScreenManager else { return }
                 guard !lockScreenManager.isLocked else { return }
-                guard vm.notchState == .closed else { return }
                 guard self.isHovering else { return }
+                let previewActive = self.coordinator.isHoverPreviewActive
+                if previewActive {
+                    guard self.isClickInClosedNotchArea() else { return }
+                } else {
+                    guard vm.notchState == .closed else { return }
+                }
                 if Defaults[.enableHaptics] {
                     self.triggerHapticIfAllowed()
                 }
@@ -1700,8 +1749,6 @@ struct ContentView: View {
         if hovering {
             startHoverClickMonitor()
             removeStickyTerminalClickMonitor()
-        } else {
-            stopHoverClickMonitor()
         }
 
         if hovering {
@@ -1713,11 +1760,17 @@ struct ContentView: View {
                 triggerHapticIfAllowed()
             }
 
-            let shouldFocusTimerTab = enableTimerFeature && timerDisplayMode == .tab && timerManager.isTimerActive && !enableMinimalisticUI
+            let shouldFocusTimerTab = enableTimerFeature
+                && timerDisplayMode == .tab
+                && timerManager.isTimerActive
+                && !enableMinimalisticUI
+                && !shouldOpenHoverPreview
+
+            let sneakPeekBlocksOpen = !shouldOpenHoverPreview && isSneakPeekVisibleOnCurrentScreen
 
             guard vm.notchState == .closed,
-                !isSneakPeekVisibleOnCurrentScreen,
-                (Defaults[.openNotchOnHover] || shouldFocusTimerTab) else { return }
+                !sneakPeekBlocksOpen,
+                (shouldOpenHoverPreview || Defaults[.openNotchOnHover] || shouldFocusTimerTab) else { return }
 
             hoverTask = Task {
                 try? await Task.sleep(for: .seconds(Defaults[.minimumHoverDuration]))
@@ -1725,8 +1778,14 @@ struct ContentView: View {
 
                 await MainActor.run {
                     guard self.vm.notchState == .closed,
-                          self.isHovering,
-                          !self.isSneakPeekVisibleOnCurrentScreen else { return }
+                          self.isHovering else { return }
+
+                    if self.shouldOpenHoverPreview {
+                        self.openHoverPreview()
+                        return
+                    }
+
+                    guard !self.isSneakPeekVisibleOnCurrentScreen else { return }
 
                     if shouldFocusTimerTab {
                         withAnimation(.smooth) {
@@ -1738,10 +1797,20 @@ struct ContentView: View {
             }
         } else {
             hoverTask = Task {
-                try? await Task.sleep(for: .milliseconds(100))
+                try? await Task.sleep(for: .milliseconds(150))
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
+                    if self.vm.isMouseHovering() {
+                        withAnimation(.bouncy.speed(1.2)) {
+                            self.isHovering = true
+                        }
+                        self.startHoverClickMonitor()
+                        return
+                    }
+
+                    self.stopHoverClickMonitor()
+
                     withAnimation(.bouncy.speed(1.2)) {
                         self.isHovering = false
                     }

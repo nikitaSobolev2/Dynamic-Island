@@ -45,7 +45,7 @@ struct ShelfItemView: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .topTrailing) {
             if !shouldHideDuringDrag {
                 VStack(alignment: .center, spacing: 2) {
                     iconView
@@ -71,6 +71,8 @@ struct ShelfItemView: View {
                         viewModel.handleClick(event: event, view: nsview)
                     }
                 )
+
+                removeButton
             } else {
                 Color.clear
                     .frame(width: 105)
@@ -108,6 +110,23 @@ struct ShelfItemView: View {
     }
 
     // MARK: - View Components
+
+    private var removeButton: some View {
+        Button {
+            ShelfActionService.remove(item)
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 16, height: 16)
+                .background(Circle().fill(Color.black.opacity(0.72)))
+        }
+        .buttonStyle(.plain)
+        .help("Remove from shelf")
+        .accessibilityLabel("Remove from shelf")
+        .padding(4)
+        .zIndex(1)
+    }
 
     private var iconView: some View {
         Image(nsImage: viewModel.thumbnail ?? item.icon)
@@ -238,6 +257,20 @@ private struct DraggableClickHandler<Content: View>: NSViewRepresentable {
         private var draggedURLs: [URL] = []
         private var draggedItems: [ShelfItem] = []
         
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            let removeHitSize: CGFloat = 22
+            let removeHitRect = NSRect(
+                x: bounds.maxX - removeHitSize,
+                y: bounds.maxY - removeHitSize,
+                width: removeHitSize,
+                height: removeHitSize
+            )
+            if removeHitRect.contains(point) {
+                return nil
+            }
+            return super.hitTest(point)
+        }
+
         override func rightMouseDown(with event: NSEvent) {
             onRightClick?(event, self)
         }

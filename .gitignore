@@ -47,6 +47,8 @@ build/
 *.vscode/
 *.idea/
 
+.cursor/
+
 # User-specific files
 *.xcuserdatad/
 *.xcodeproj/xcuserdata
@@ -140,6 +142,7 @@ PrivateWorks
 
 *.py
 *.sh
+!scripts/run-test.sh
 comparison_report.json
 *.txt
 ANIMATION_DEBUG_GUIDE.md

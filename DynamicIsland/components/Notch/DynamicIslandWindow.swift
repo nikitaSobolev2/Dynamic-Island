@@ -65,4 +65,8 @@ class DynamicIslandWindow: NSPanel {
         true
     }
 
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        frameRect
+    }
+
 }

@@ -560,7 +560,7 @@ struct NotchHomeView: View {
 
     private var mainContent: some View {
         HStack(alignment: .top, spacing: 20) {
-            if Defaults[.enableMinimalisticUI] {
+            if vm.usesMinimalisticLayout {
                 if let overridePayload = minimalisticOverridePayload {
                     ExtensionMinimalisticExperienceView(
                         payload: overridePayload,

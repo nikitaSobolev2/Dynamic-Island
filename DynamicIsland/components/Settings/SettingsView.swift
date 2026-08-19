@@ -710,6 +710,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .general, title: "Extend hover area", keywords: ["hover", "cursor"], highlightID: SettingsTab.general.highlightID(for: "Extend hover area")),
             SettingsSearchEntry(tab: .general, title: "Enable haptics", keywords: ["haptic", "feedback"], highlightID: SettingsTab.general.highlightID(for: "Enable haptics")),
             SettingsSearchEntry(tab: .general, title: "Open notch on hover", keywords: ["hover to open", "auto open"], highlightID: SettingsTab.general.highlightID(for: "Open notch on hover")),
+            SettingsSearchEntry(tab: .general, title: "On-hover preview", keywords: ["hover preview", "minimalistic", "compact", "media preview"], highlightID: SettingsTab.general.highlightID(for: "On-hover preview")),
             SettingsSearchEntry(tab: .general, title: "External display style", keywords: ["dynamic island", "pill", "external display", "non-notch", "floating", "capsule"], highlightID: SettingsTab.general.highlightID(for: "External display style")),
             SettingsSearchEntry(tab: .general, title: "Hide until hovered", keywords: ["hide", "hover", "external", "non-notch", "auto hide", "slide"], highlightID: SettingsTab.general.highlightID(for: "Hide until hovered")),
             SettingsSearchEntry(tab: .general, title: "Notch display height", keywords: ["display height", "menu bar size"], highlightID: SettingsTab.general.highlightID(for: "Notch display height")),
@@ -1032,6 +1033,7 @@ struct GeneralSettings: View {
     @Default(.automaticallySwitchDisplay) var automaticallySwitchDisplay
     @Default(.enableGestures) var enableGestures
     @Default(.openNotchOnHover) var openNotchOnHover
+    @Default(.onHoverPreview) var onHoverPreview
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
     @Default(.enableHorizontalMusicGestures) var enableHorizontalMusicGestures
     @Default(.musicGestureBehavior) var musicGestureBehavior
@@ -1042,6 +1044,13 @@ struct GeneralSettings: View {
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.general.highlightID(for: title)
+    }
+
+    private var onHoverPreviewFooter: String {
+        if enableMinimalisticUI {
+            return String(localized: "Unavailable while Minimalistic UI is on. Hover already opens the compact player.")
+        }
+        return String(localized: "Hover shows the compact media player. Click the closed notch to open the full Dynamic Island.")
     }
 
     var body: some View {
@@ -1264,8 +1273,16 @@ struct GeneralSettings: View {
                 Text("Open notch on hover")
             }
             .settingsHighlight(id: highlightID("Open notch on hover"))
+            Defaults.Toggle(key: .onHoverPreview) {
+                Text("On-hover preview")
+            }
+            .disabled(enableMinimalisticUI)
+            .settingsHighlight(id: highlightID("On-hover preview"))
+            Text(onHoverPreviewFooter)
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Toggle("Remember last tab", isOn: $coordinator.openLastTabByDefault)
-            if openNotchOnHover {
+            if openNotchOnHover || (onHoverPreview && !enableMinimalisticUI) {
                 Slider(value: $minimumHoverDuration, in: 0...1, step: 0.1) {
                     HStack {
                         Text("Minimum hover duration")
