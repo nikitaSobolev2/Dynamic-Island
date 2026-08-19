@@ -561,46 +561,52 @@ struct NotchHomeView: View {
     private var mainContent: some View {
         HStack(alignment: .top, spacing: 20) {
             if vm.usesMinimalisticLayout {
-                if let overridePayload = minimalisticOverridePayload {
-                    ExtensionMinimalisticExperienceView(
-                        payload: overridePayload,
-                        albumArtNamespace: albumArtNamespace
-                    )
-                } else {
-                    MinimalisticMusicPlayerView(albumArtNamespace: albumArtNamespace)
+                Group {
+                    if let overridePayload = minimalisticOverridePayload {
+                        ExtensionMinimalisticExperienceView(
+                            payload: overridePayload,
+                            albumArtNamespace: albumArtNamespace
+                        )
+                    } else {
+                        MinimalisticMusicPlayerView(albumArtNamespace: albumArtNamespace)
+                    }
                 }
+                .transition(.opacity)
             } else {
-                // Normal mode: Show full music player with optional calendar and webcam
-                if shouldShowMusicPlayer {
-                    MusicPlayerView(albumArtNamespace: albumArtNamespace)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                
-                if Defaults[.showCalendar] {
-                    Group {
-                        if shouldShowMusicPlayer {
-                            CalendarView()
-                        } else {
-                            StandaloneCalendarView()
+                Group {
+                    if shouldShowMusicPlayer {
+                        MusicPlayerView(albumArtNamespace: albumArtNamespace)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    if Defaults[.showCalendar] {
+                        Group {
+                            if shouldShowMusicPlayer {
+                                CalendarView()
+                            } else {
+                                StandaloneCalendarView()
+                            }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .onHover { isHovering in
+                            vm.isHoveringCalendar = isHovering
+                        }
+                        .environmentObject(vm)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .onHover { isHovering in
-                        vm.isHoveringCalendar = isHovering
+
+                    if Defaults[.showMirror],
+                       webcamManager.cameraAvailable,
+                       vm.notchState == .open {
+                        CameraPreviewView(webcamManager: webcamManager)
+                            .scaledToFit()
+                            .opacity(vm.notchState == .closed ? 0 : 1)
+                            .blur(radius: vm.notchState == .closed ? 20 : 0)
                     }
-                    .environmentObject(vm)
                 }
-                
-                if Defaults[.showMirror],
-                   webcamManager.cameraAvailable,
-                   vm.notchState == .open {
-                    CameraPreviewView(webcamManager: webcamManager)
-                        .scaledToFit()
-                        .opacity(vm.notchState == .closed ? 0 : 1)
-                        .blur(radius: vm.notchState == .closed ? 20 : 0)
-                }
+                .transition(.opacity.combined(with: .blurReplace))
             }
         }
+        .animation(.spring(response: 0.42, dampingFraction: 0.8), value: vm.usesMinimalisticLayout)
         .transition(.opacity.animation(.smooth.speed(0.9))
             .combined(with: .blurReplace.animation(.smooth.speed(0.9)))
             .combined(with: .move(edge: .top)))

@@ -547,6 +547,7 @@ struct ContentView: View {
             maxHeight: dynamicNotchSize.height + currentShadowPadding + (isDynamicIslandMode ? dynamicIslandTopOffset : 0),
             alignment: .top
         )
+        .animation(vm.notchState == .open ? hoverPreviewToFullAnimation : nil, value: vm.usesMinimalisticLayout)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .environmentObject(privacyManager)
         .onChange(of: dynamicNotchSize) { oldSize, newSize in
@@ -1606,10 +1607,17 @@ struct ContentView: View {
     }
 
     private func openNotch() {
-        vm.endHoverPreviewWithoutRestoringTab()
-        withAnimation(.bouncy.speed(1.2)) {
+        withAnimation(hoverPreviewToFullAnimation) {
+            vm.endHoverPreviewWithoutRestoringTab()
             vm.open()
         }
+    }
+
+    private var hoverPreviewToFullAnimation: Animation {
+        if useModernCloseAnimation {
+            return .spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
+        }
+        return .bouncy.speed(1.2)
     }
 
     private func openHoverPreview() {

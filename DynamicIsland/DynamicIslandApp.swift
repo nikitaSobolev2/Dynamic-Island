@@ -406,7 +406,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let newY = screenFrame.origin.y + screenFrame.height - clampedHeight
         let targetFrame = NSRect(x: newX, y: newY, width: clampedWidth, height: clampedHeight)
 
-        window.setFrame(targetFrame, display: true)
+        if animated {
+            let previousBehavior = window.animationBehavior
+            window.animationBehavior = .utilityWindow
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.42
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                context.allowsImplicitAnimation = true
+                window.animator().setFrame(targetFrame, display: true)
+            } completionHandler: {
+                window.setFrame(targetFrame, display: true)
+                window.animationBehavior = previousBehavior
+            }
+        } else {
+            window.setFrame(targetFrame, display: true)
+        }
     }
 
     private func shouldAnimateResize(for newSize: CGSize) -> Bool {
@@ -494,12 +508,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }.store(in: &cancellables)
 
-        // Hover preview uses the same compact size as Minimalistic UI. Resize
-        // + recenter as soon as that flag flips, or the panel grows from its
-        // origin and the full island sits off to the right.
+        // Hover preview shrinks to the compact size. Preview → full is owned
+        // by `open()` so this observer does not restart that window animation.
         coordinator.$isHoverPreviewActive
             .removeDuplicates()
-            .sink { [weak self] _ in
+            .sink { [weak self] isPreviewActive in
+                guard isPreviewActive else { return }
                 DispatchQueue.main.async {
                     self?.updateWindowSizeIfNeeded()
                 }

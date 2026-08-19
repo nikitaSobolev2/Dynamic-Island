@@ -50,6 +50,7 @@ struct DynamicIslandHeader: View {
                 .blur(radius: vm.notchState == .closed ? 20 : 0)
                 .animation(.smooth.delay(0.1), value: vm.notchState)
                 .zIndex(2)
+                .transition(.opacity)
             }
 
             if vm.notchState == .open && !vm.usesMinimalisticLayout {
@@ -61,6 +62,7 @@ struct DynamicIslandHeader: View {
                     .mask {
                         NotchShape()
                     }
+                    .transition(.opacity)
             }
 
             HStack(spacing: 4) {
@@ -248,6 +250,7 @@ struct DynamicIslandHeader: View {
             .animation(.smooth.delay(0.1), value: vm.notchState)
             .zIndex(2)
         }
+        .animation(.spring(response: 0.42, dampingFraction: 0.8), value: vm.usesMinimalisticLayout)
         .foregroundColor(.gray)
         .environmentObject(vm)
         .onChange(of: coordinator.shouldToggleClipboardPopover) { _ in

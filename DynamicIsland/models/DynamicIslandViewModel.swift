@@ -324,9 +324,14 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
 
     func open() {
         let targetSize = calculateDynamicNotchSize()
+        let expandingWhileOpen = notchState == .open
 
         let applyWindowResize: () -> Void = { [weak self] in
-            self?.resizeOpenWindow(to: targetSize, animated: false, force: true)
+            self?.resizeOpenWindow(
+                to: targetSize,
+                animated: expandingWhileOpen,
+                force: true
+            )
         }
 
         if Thread.isMainThread {
@@ -338,15 +343,18 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         notchSize = targetSize
         notchState = .open
 
-        // Hosting-view layout can run after this call and shove the panel
-        // from its origin. Recenter once SwiftUI has applied the new size.
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.notchState == .open else { return }
-            self.resizeOpenWindow(
-                to: self.calculateDynamicNotchSize(),
-                animated: false,
-                force: true
-            )
+        // Instant recenter after layout only when opening from closed.
+        // Preview → full already animates the window; a same-tick snap
+        // would cancel that animation.
+        if !expandingWhileOpen {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.notchState == .open else { return }
+                self.resizeOpenWindow(
+                    to: self.calculateDynamicNotchSize(),
+                    animated: false,
+                    force: true
+                )
+            }
         }
 
         // Force music information update when notch is opened
