@@ -284,9 +284,17 @@ struct ContentView: View {
     }
 
     /// Whether the notch/island should hide off-screen when closed on a non-notch display.
-    /// Temporarily reveals the notch when a sneakPeek HUD (volume, brightness, music, etc.) is active.
+    /// Temporarily reveals the notch when a sneakPeek HUD or screenshot toast is active.
     private var shouldHideUntilHover: Bool {
-        hideNonNotchUntilHover && isNonNotchScreen && vm.notchState == .closed && !isSneakPeekVisibleOnCurrentScreen
+        hideNonNotchUntilHover
+            && isNonNotchScreen
+            && vm.notchState == .closed
+            && !isSneakPeekVisibleOnCurrentScreen
+            && !isScreenshotNotificationVisible
+    }
+
+    private var isScreenshotNotificationVisible: Bool {
+        coordinator.expandingView.show && coordinator.expandingView.type == .screenshot
     }
 
     /// Whether the fallback top-edge hover detector should run.
@@ -733,6 +741,8 @@ struct ContentView: View {
                             .frame(width: 76, alignment: .trailing)
                         }
                         .frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0), alignment: .center)
+                      } else if coordinator.expandingView.type == .screenshot && coordinator.expandingView.show && vm.notchState == .closed && Defaults[.enableScreenshotNotifications] {
+                          ScreenshotClosedNotchNotification(isHovering: isHovering)
                       } else if isSneakPeekVisibleOnCurrentScreen && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && (coordinator.sneakPeek.type != .reminder) && !coordinator.sneakPeek.type.isExtensionPayload && ((coordinator.sneakPeek.type != .volume && coordinator.sneakPeek.type != .brightness && coordinator.sneakPeek.type != .backlight) || vm.notchState == .closed) {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(
@@ -1684,7 +1694,9 @@ struct ContentView: View {
                 guard !lockScreenManager.isLocked else { return }
                 guard self.isHovering else { return }
                 let previewActive = self.coordinator.isHoverPreviewActive
-                if previewActive {
+                let screenshotToastVisible = self.coordinator.expandingView.show
+                    && self.coordinator.expandingView.type == .screenshot
+                if previewActive || screenshotToastVisible {
                     guard self.isClickInClosedNotchArea() else { return }
                 } else {
                     guard vm.notchState == .closed else { return }

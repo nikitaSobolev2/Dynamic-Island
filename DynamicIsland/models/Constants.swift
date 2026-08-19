@@ -1076,6 +1076,9 @@ extension Defaults.Keys {
     )
     static let osdIconColorStyle = Key<OSDIconColorStyle>("osdIconColorStyle", default: .white)
     
+    // MARK: Screenshot Notifications
+    static let enableScreenshotNotifications = Key<Bool>("enableScreenshotNotifications", default: true)
+
     // MARK: Screen Recording Detection Feature
     static let enableScreenRecordingDetection = Key<Bool>("enableScreenRecordingDetection", default: true)
     static let showRecordingIndicator = Key<Bool>("showRecordingIndicator", default: true)

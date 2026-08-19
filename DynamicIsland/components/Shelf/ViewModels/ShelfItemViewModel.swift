@@ -343,6 +343,9 @@ final class ShelfItemViewModel: ObservableObject {
             let imageActions = NSMenuItem(title: "Image Actions", action: nil, keyEquivalent: "")
             let imageSubmenu = NSMenu()
 
+            let copyImage = NSMenuItem(title: "Copy Image", action: nil, keyEquivalent: "")
+            imageSubmenu.addItem(copyImage)
+
             // Remove Background - only for single images
             if imageURLs.count == 1 {
                 let removeBg = NSMenuItem(title: "Remove Background", action: nil, keyEquivalent: "")
@@ -554,6 +557,9 @@ final class ShelfItemViewModel: ObservableObject {
                         }
                     }
                 }
+
+            case "Copy Image":
+                copySelectedImagesToPasteboard()
 
             case "Remove":
                 let selected = ShelfSelectionModel.shared.selectedItems(in: ShelfStateViewModel.shared.items)
@@ -802,6 +808,30 @@ final class ShelfItemViewModel: ObservableObject {
             }
         }
         
+        @MainActor
+        private func copySelectedImagesToPasteboard() {
+            let selected = ShelfSelectionModel.shared.selectedItems(in: ShelfStateViewModel.shared.items)
+            Task {
+                var images: [NSImage] = []
+                for item in selected {
+                    guard case .file = item.kind else { continue }
+                    guard let url = ShelfStateViewModel.shared.resolveAndUpdateBookmark(for: item) else { continue }
+                    guard ImageProcessingService.shared.isImageFile(url) else { continue }
+                    let didStart = url.startAccessingSecurityScopedResource()
+                    defer {
+                        if didStart { url.stopAccessingSecurityScopedResource() }
+                    }
+                    if let image = NSImage(contentsOf: url) {
+                        images.append(image)
+                    }
+                }
+                guard !images.isEmpty else { return }
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                pasteboard.writeObjects(images)
+            }
+        }
+
         @MainActor
         private func handleRemoveBackground() {
             let selected = ShelfSelectionModel.shared.selectedItems(in: ShelfStateViewModel.shared.items)

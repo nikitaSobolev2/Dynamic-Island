@@ -718,6 +718,7 @@ struct SettingsView: View {
             // Live Activities
             SettingsSearchEntry(tab: .liveActivities, title: "Enable Screen Recording Detection", keywords: ["screen recording", "indicator"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Screen Recording Detection")),
             SettingsSearchEntry(tab: .liveActivities, title: "Show Recording Indicator", keywords: ["recording indicator", "red dot"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show Recording Indicator")),
+            SettingsSearchEntry(tab: .liveActivities, title: "Screenshot notifications", keywords: ["screenshot", "shelf", "capture", "finder"], highlightID: SettingsTab.liveActivities.highlightID(for: "Screenshot notifications")),
             SettingsSearchEntry(tab: .liveActivities, title: "Enable Focus Detection", keywords: ["focus", "do not disturb", "dnd"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Focus Detection")),
             SettingsSearchEntry(tab: .liveActivities, title: "Show Focus Indicator", keywords: ["focus icon", "moon"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show Focus Indicator")),
             SettingsSearchEntry(tab: .liveActivities, title: "Show Focus Label", keywords: ["focus label", "text"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show Focus Label")),
@@ -3611,6 +3612,17 @@ struct LiveActivitiesSettings: View {
                 Text("Screen Recording")
             } footer: {
                 Text("Uses event-driven private API for real-time screen recording detection")
+            }
+
+            Section {
+                Defaults.Toggle(key: .enableScreenshotNotifications) {
+                    Text("Screenshot notifications")
+                }
+                .settingsHighlight(id: highlightID("Screenshot notifications"))
+            } header: {
+                Text("Screenshots")
+            } footer: {
+                Text("Shows a notch notification when you take a screenshot. Saved screenshots are copied to the shelf. Clipboard-only captures notify without a Reveal button.")
             }
 
             Section {
