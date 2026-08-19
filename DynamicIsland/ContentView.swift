@@ -164,8 +164,6 @@ struct ContentView: View {
     @State private var pendingMusicControlForceRefresh = false
     @State private var musicControlSuppressionTask: Task<Void, Never>?
 
-    @State private var haptics: Bool = false
-
     @Namespace var albumArtNamespace
 
     @Default(.useMusicVisualizer) var useMusicVisualizer
@@ -524,7 +522,6 @@ struct ContentView: View {
                         )
                     }
                 }
-                .sensoryFeedback(.alignment, trigger: haptics)
                 .contextMenu {
                     Button("Settings") {
                         SettingsWindowController.shared.showWindow()
@@ -1607,8 +1604,8 @@ struct ContentView: View {
     }
 
     private func openNotch() {
-        if coordinator.isHoverPreviewActive, Defaults[.enableHaptics] {
-            triggerHapticIfAllowed()
+        if coordinator.isHoverPreviewActive {
+            triggerHapticIfAllowed(ignoringCooldown: true)
         }
         withAnimation(hoverPreviewToFullAnimation) {
             vm.endHoverPreviewWithoutRestoringTab()
@@ -1712,7 +1709,7 @@ struct ContentView: View {
                 } else {
                     guard vm.notchState == .closed else { return }
                 }
-                if Defaults[.enableHaptics] {
+                if !previewActive, Defaults[.enableHaptics] {
                     self.triggerHapticIfAllowed()
                 }
                 self.openNotch()
@@ -1870,13 +1867,12 @@ struct ContentView: View {
         coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
     }
     
-    // Helper to prevent rapid haptic feedback
-    private func triggerHapticIfAllowed() {
+    private func triggerHapticIfAllowed(ignoringCooldown: Bool = false) {
+        guard Defaults[.enableHaptics] else { return }
         let now = Date()
-        if now.timeIntervalSince(lastHapticTime) > 0.3 { // Minimum 300ms between haptics
-            haptics.toggle()
-            lastHapticTime = now
-        }
+        guard ignoringCooldown || now.timeIntervalSince(lastHapticTime) > 0.3 else { return }
+        lastHapticTime = now
+        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
     }
     
     // Helper to check if stats tab has 4+ graphs (needs expanded height)
