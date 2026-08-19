@@ -1607,6 +1607,9 @@ struct ContentView: View {
     }
 
     private func openNotch() {
+        if coordinator.isHoverPreviewActive, Defaults[.enableHaptics] {
+            triggerHapticIfAllowed()
+        }
         withAnimation(hoverPreviewToFullAnimation) {
             vm.endHoverPreviewWithoutRestoringTab()
             vm.open()
