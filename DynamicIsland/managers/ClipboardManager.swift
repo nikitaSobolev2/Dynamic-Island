@@ -101,8 +101,25 @@ struct ClipboardItem: Identifiable, Codable {
     }
 
     func previewImage() -> NSImage? {
-        guard type == .image, let data = getImageData() else { return nil }
-        return NSImage(data: data)
+        if type == .image, let data = getImageData(), let image = NSImage(data: data) {
+            return image
+        }
+
+        guard let fileURLs else { return nil }
+        for fileURL in fileURLs.compactMap(Self.fileURL(fromStored:)) {
+            if let image = NSImage(contentsOf: fileURL), image.size.width > 0 {
+                return image
+            }
+        }
+        return nil
+    }
+
+    private static func fileURL(fromStored value: String) -> URL? {
+        if let url = URL(string: value), url.isFileURL {
+            return url
+        }
+        let pathURL = URL(fileURLWithPath: value)
+        return pathURL.isFileURL ? pathURL : nil
     }
 
     func discardStoredImage() {
@@ -244,11 +261,15 @@ class ClipboardManager: ObservableObject {
     
     func startMonitoring() {
         guard !isMonitoring else { return }
-        
+
         isMonitoring = true
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        lastChangeCount = NSPasteboard.general.changeCount
+        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.checkClipboard()
         }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+        checkClipboard()
     }
     
     func stopMonitoring() {
@@ -387,7 +408,6 @@ class ClipboardManager: ObservableObject {
             return ClipboardItem(fileURLs: fileURLs.map(\.absoluteString))
         }
 
-        // Prefer bitmap over accompanying URL/HTML (browser / screenshot copies).
         if let imageData = imageData(from: pasteboard) {
             return ClipboardItem(imageData: imageData)
         }
@@ -413,28 +433,72 @@ class ClipboardManager: ObservableObject {
     }
 
     private func readableFileURLs(from pasteboard: NSPasteboard) -> [URL] {
+        var urls: [URL] = []
+
         let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        guard let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL] else {
-            return []
+        if let objects = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL] {
+            urls.append(contentsOf: objects)
         }
-        return urls.filter { url in
-            url.isFileURL && FileManager.default.fileExists(atPath: url.path)
+
+        if urls.isEmpty, let items = pasteboard.pasteboardItems {
+            for item in items {
+                if let raw = item.string(forType: .fileURL), let url = URL(string: raw) {
+                    urls.append(url)
+                }
+            }
         }
+
+        if urls.isEmpty,
+           let filenames = pasteboard.propertyList(
+            forType: NSPasteboard.PasteboardType("NSFilenamesPboardType")
+           ) as? [String] {
+            urls.append(contentsOf: filenames.map { URL(fileURLWithPath: $0) })
+        }
+
+        var uniquePaths = Set<String>()
+        return urls.compactMap(resolvedExistingFileURL).filter { url in
+            uniquePaths.insert(url.path).inserted
+        }
+    }
+
+    private func resolvedExistingFileURL(_ url: URL) -> URL? {
+        guard url.isFileURL else { return nil }
+        let pathURL = (url as NSURL).filePathURL ?? url
+        let standardized = pathURL.standardizedFileURL.resolvingSymlinksInPath()
+        guard FileManager.default.fileExists(atPath: standardized.path) else { return nil }
+        return standardized
     }
 
     private func clipboardImageItem(from fileURLs: [URL]) -> ClipboardItem? {
-        let imageURL = fileURLs.first(where: isImageFile)
-        guard let imageURL, let imageData = try? Data(contentsOf: imageURL) else {
+        for fileURL in fileURLs where isImageFile(fileURL) {
+            if let imageData = imageData(fromFile: fileURL) {
+                return ClipboardItem(imageData: imageData)
+            }
+        }
+        return nil
+    }
+
+    private func imageData(fromFile url: URL) -> Data? {
+        if let data = try? Data(contentsOf: url), NSImage(data: data) != nil {
+            return data
+        }
+        guard let image = NSImage(contentsOf: url),
+              image.size.width > 0,
+              let tiff = image.tiffRepresentation else {
             return nil
         }
-        return ClipboardItem(imageData: imageData)
+        return tiff
     }
 
     private func isImageFile(_ url: URL) -> Bool {
-        if let contentType = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType {
-            return contentType.conforms(to: .image)
+        if let contentType = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType,
+           contentType.conforms(to: .image) {
+            return true
         }
-        return UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) == true
+        if let type = UTType(filenameExtension: url.pathExtension), type.conforms(to: .image) {
+            return true
+        }
+        return false
     }
 
     private func imageData(from pasteboard: NSPasteboard) -> Data? {

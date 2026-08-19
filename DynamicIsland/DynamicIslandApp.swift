@@ -495,6 +495,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Setup Privacy Indicator Manager (camera and microphone monitoring)
         PrivacyIndicatorManager.shared.startMonitoring()
+
+        if Defaults[.enableClipboardManager] {
+            ClipboardManager.shared.startMonitoring()
+        }
         
         // Observe tab changes - use immediate resize to keep the notch pinned
         // Deferred to next run loop tick because @Published fires on willSet,
@@ -592,9 +596,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }.store(in: &cancellables)
 
-        Defaults.publisher(.enableClipboardManager, options: []).sink { [weak self] _ in
+        Defaults.publisher(.enableClipboardManager, options: []).sink { [weak self] change in
             Task { @MainActor [weak self] in
-                self?.updateFeatureShortcutAvailability()
+                guard let self else { return }
+                if change.newValue {
+                    ClipboardManager.shared.startMonitoring()
+                } else {
+                    ClipboardManager.shared.stopMonitoring()
+                }
+                self.updateFeatureShortcutAvailability()
             }
         }.store(in: &cancellables)
 
