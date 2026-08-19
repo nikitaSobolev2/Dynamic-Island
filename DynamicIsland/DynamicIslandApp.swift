@@ -407,16 +407,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let targetFrame = NSRect(x: newX, y: newY, width: clampedWidth, height: clampedHeight)
 
         if animated {
-            let previousBehavior = window.animationBehavior
-            window.animationBehavior = .utilityWindow
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.42
                 context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 context.allowsImplicitAnimation = true
-                window.animator().setFrame(targetFrame, display: true)
+                window.setFrame(targetFrame, display: true, animate: true)
             } completionHandler: {
                 window.setFrame(targetFrame, display: true)
-                window.animationBehavior = previousBehavior
             }
         } else {
             window.setFrame(targetFrame, display: true)
@@ -508,14 +505,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }.store(in: &cancellables)
 
-        // Hover preview shrinks to the compact size. Preview → full is owned
-        // by `open()` so this observer does not restart that window animation.
+        // Hover preview uses the compact size; leaving it must grow back to
+        // full width. Deferred because @Published fires on willSet.
         coordinator.$isHoverPreviewActive
             .removeDuplicates()
-            .sink { [weak self] isPreviewActive in
-                guard isPreviewActive else { return }
+            .sink { [weak self] _ in
                 DispatchQueue.main.async {
-                    self?.updateWindowSizeIfNeeded()
+                    self?.updateWindowSizeForTabSwitch()
                 }
             }
             .store(in: &cancellables)
