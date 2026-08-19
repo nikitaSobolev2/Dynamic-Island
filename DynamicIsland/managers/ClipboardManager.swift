@@ -53,17 +53,16 @@ struct ClipboardItem: Identifiable, Codable {
         self.rtfData = nil
         self.type = .image
         self.timestamp = Date()
-        
-        // Save image data to temporary file instead of storing in UserDefaults
+
+        let storedData = Self.pngData(from: imageData) ?? imageData
         let fileName = "clipboard_image_\(UUID().uuidString).png"
         let fileURL = ClipboardManager.clipboardDataDirectory.appendingPathComponent(fileName)
-        
+
         do {
-            try imageData.write(to: fileURL)
+            try storedData.write(to: fileURL)
             self.imageFileName = fileName
-            self.preview = "Image (\(ByteCountFormatter.string(fromByteCount: Int64(imageData.count), countStyle: .file)))"
+            self.preview = Self.imagePreviewText(from: storedData)
         } catch {
-            print("Failed to save image data: \(error)")
             self.imageFileName = nil
             self.preview = "Image (failed to save)"
         }
@@ -95,11 +94,41 @@ struct ClipboardItem: Identifiable, Codable {
         self.preview = String(plainText.prefix(50))
     }
     
-    // Helper to get image data from file
     func getImageData() -> Data? {
         guard let fileName = imageFileName else { return nil }
         let fileURL = ClipboardManager.clipboardDataDirectory.appendingPathComponent(fileName)
         return try? Data(contentsOf: fileURL)
+    }
+
+    func previewImage() -> NSImage? {
+        guard type == .image, let data = getImageData() else { return nil }
+        return NSImage(data: data)
+    }
+
+    func discardStoredImage() {
+        guard let fileName = imageFileName else { return }
+        let fileURL = ClipboardManager.clipboardDataDirectory.appendingPathComponent(fileName)
+        try? FileManager.default.removeItem(at: fileURL)
+    }
+
+    static func pngData(from data: Data) -> Data? {
+        guard let image = NSImage(data: data),
+              image.size.width > 0,
+              image.size.height > 0,
+              let tiff = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff) else {
+            return nil
+        }
+        return bitmap.representation(using: .png, properties: [:])
+    }
+
+    private static func imagePreviewText(from data: Data) -> String {
+        let sizeText = ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)
+        guard let image = NSImage(data: data),
+              let representation = image.representations.first else {
+            return "Image (\(sizeText))"
+        }
+        return "Image \(representation.pixelsWide)×\(representation.pixelsHigh) (\(sizeText))"
     }
     
     // Helper to check if this item has the same content as another
@@ -238,9 +267,11 @@ class ClipboardManager: ObservableObject {
                 pasteboard.setString(stringData, forType: .string)
             }
         case .image:
-            if let imageData = item.getImageData() {
-                pasteboard.setData(imageData, forType: .png)
+            guard let imageData = item.getImageData() else { break }
+            if let image = NSImage(data: imageData) {
+                pasteboard.writeObjects([image])
             }
+            pasteboard.setData(ClipboardItem.pngData(from: imageData) ?? imageData, forType: .png)
         case .file:
             if let fileURLs = item.fileURLs {
                 let urls = fileURLs.compactMap { URL(string: $0) }
@@ -259,28 +290,18 @@ class ClipboardManager: ObservableObject {
                 pasteboard.setString(stringData, forType: .string)
             }
         }
+
+        lastChangeCount = pasteboard.changeCount
     }
     
     func deleteItem(_ item: ClipboardItem) {
-        // Clean up associated files
-        if let fileName = item.imageFileName {
-            let fileURL = ClipboardManager.clipboardDataDirectory.appendingPathComponent(fileName)
-            try? FileManager.default.removeItem(at: fileURL)
-        }
-        
+        item.discardStoredImage()
         clipboardHistory.removeAll { $0.id == item.id }
         saveHistoryToDefaults()
     }
     
     func clearHistory() {
-        // Clean up all associated files
-        for item in clipboardHistory {
-            if let fileName = item.imageFileName {
-                let fileURL = ClipboardManager.clipboardDataDirectory.appendingPathComponent(fileName)
-                try? FileManager.default.removeItem(at: fileURL)
-            }
-        }
-        
+        clipboardHistory.forEach { $0.discardStoredImage() }
         clipboardHistory.removeAll()
         saveHistoryToDefaults()
     }
@@ -317,10 +338,7 @@ class ClipboardManager: ObservableObject {
         if clipboardHistory.count > maxHistoryItems {
             let itemsToDelete = Array(clipboardHistory.dropFirst(maxHistoryItems))
             for oldItem in itemsToDelete {
-                if let fileName = oldItem.imageFileName {
-                    let fileURL = ClipboardManager.clipboardDataDirectory.appendingPathComponent(fileName)
-                    try? FileManager.default.removeItem(at: fileURL)
-                }
+                oldItem.discardStoredImage()
             }
             clipboardHistory = Array(clipboardHistory.prefix(maxHistoryItems))
         }
@@ -346,97 +364,104 @@ class ClipboardManager: ObservableObject {
         lastChangeCount = currentChangeCount
         
         guard let clipboardItem = getCurrentClipboardItem() else { return }
-        
-        // Don't add duplicate items
-        if !clipboardHistory.contains(where: { isSameContent($0, clipboardItem) }) {
-            addToHistory(clipboardItem)
+
+        let alreadyStored = clipboardHistory.contains { isSameContent($0, clipboardItem) }
+            || pinnedItems.contains { isSameContent($0, clipboardItem) }
+        if alreadyStored {
+            clipboardItem.discardStoredImage()
+            return
         }
+
+        addToHistory(clipboardItem)
     }
-    
+
     private func getCurrentClipboardItem() -> ClipboardItem? {
         let pasteboard = NSPasteboard.general
-        
-        // Step 1: Check what types are available
-        let hasFileURLs = pasteboard.canReadObject(forClasses: [NSURL.self], options: nil)
-        let hasImageData = pasteboard.data(forType: .png) != nil || 
-                          pasteboard.data(forType: .tiff) != nil || 
-                          pasteboard.data(forType: NSPasteboard.PasteboardType("public.jpeg")) != nil
-        let hasString = pasteboard.string(forType: .string) != nil
-        
-        // Step 2: Smart detection based on context
-        
-        // Priority 1: If there are file URLs AND the files are actual image files, treat as image files (from Finder)
-        if hasFileURLs {
-            if let fileURLs = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
-                let realFileURLs = fileURLs.filter { url in
-                    return url.isFileURL && 
-                           !url.path.contains("/.file/id=") && 
-                           !url.path.contains("/tmp/") && 
-                           !url.path.hasPrefix("/private/var/") && 
-                           !url.path.contains("/ClipboardViewer") && 
-                           FileManager.default.fileExists(atPath: url.path)
-                }
-                
-                if !realFileURLs.isEmpty {
-                    // Check if these are image files - if so, try to load the actual image data
-                    let imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "webp", "heic", "heif"]
-                    let imageFiles = realFileURLs.filter { url in
-                        imageExtensions.contains(url.pathExtension.lowercased())
-                    }
-                    
-                    // If we have image files from Finder, load the actual image data
-                    if !imageFiles.isEmpty, let firstImageURL = imageFiles.first {
-                        if let imageData = try? Data(contentsOf: firstImageURL) {
-                            return ClipboardItem(imageData: imageData)
-                        }
-                    }
-                    
-                    // Otherwise, treat as file(s)
-                    let urlStrings = realFileURLs.map { $0.absoluteString }
-                    return ClipboardItem(fileURLs: urlStrings)
-                }
-            }
+        let fileURLs = readableFileURLs(from: pasteboard)
+
+        if let imageItem = clipboardImageItem(from: fileURLs) {
+            return imageItem
         }
-        
-        // Priority 2: If there's ONLY image data without file URLs (screenshots, direct image paste)
-        if hasImageData && !hasFileURLs {
-            if let imageData = pasteboard.data(forType: .png) {
-                return ClipboardItem(imageData: imageData)
-            } else if let imageData = pasteboard.data(forType: .tiff) {
-                return ClipboardItem(imageData: imageData)
-            } else if let imageData = pasteboard.data(forType: NSPasteboard.PasteboardType("public.jpeg")) {
-                return ClipboardItem(imageData: imageData)
-            }
+
+        if !fileURLs.isEmpty {
+            return ClipboardItem(fileURLs: fileURLs.map(\.absoluteString))
         }
-        
-        // Priority 3: Plain text (including copied text)
+
+        // Prefer bitmap over accompanying URL/HTML (browser / screenshot copies).
+        if let imageData = imageData(from: pasteboard) {
+            return ClipboardItem(imageData: imageData)
+        }
+
         if let string = pasteboard.string(forType: .string), !string.isEmpty {
-            // Determine if it's a URL
             if string.hasPrefix("http://") || string.hasPrefix("https://") {
                 return ClipboardItem(stringData: string, type: .url)
             }
             return ClipboardItem(stringData: string, type: .text)
         }
-        
-        // Priority 4: RTF
+
         if let rtfData = pasteboard.data(forType: .rtf),
-           let rtfString = NSAttributedString(rtf: rtfData, documentAttributes: nil)?.string, !rtfString.isEmpty {
+           let rtfString = NSAttributedString(rtf: rtfData, documentAttributes: nil)?.string,
+           !rtfString.isEmpty {
             return ClipboardItem(rtfData: rtfData, plainText: rtfString)
         }
-        
-        // Priority 5: If we have image data WITH file URLs (document thumbnails), 
-        // this is likely a document with a preview - ignore the thumbnail and treat as unknown
-        if hasImageData && hasFileURLs {
-            // This is likely a document with a thumbnail preview - we don't want the thumbnail
-            return nil
-        }
-        
-        // Priority 6: URL strings
+
         if let url = pasteboard.string(forType: .URL) {
             return ClipboardItem(stringData: url, type: .url)
         }
-        
+
         return nil
+    }
+
+    private func readableFileURLs(from pasteboard: NSPasteboard) -> [URL] {
+        let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
+        guard let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL] else {
+            return []
+        }
+        return urls.filter { url in
+            url.isFileURL && FileManager.default.fileExists(atPath: url.path)
+        }
+    }
+
+    private func clipboardImageItem(from fileURLs: [URL]) -> ClipboardItem? {
+        let imageURL = fileURLs.first(where: isImageFile)
+        guard let imageURL, let imageData = try? Data(contentsOf: imageURL) else {
+            return nil
+        }
+        return ClipboardItem(imageData: imageData)
+    }
+
+    private func isImageFile(_ url: URL) -> Bool {
+        if let contentType = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType {
+            return contentType.conforms(to: .image)
+        }
+        return UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) == true
+    }
+
+    private func imageData(from pasteboard: NSPasteboard) -> Data? {
+        let preferredTypes: [NSPasteboard.PasteboardType] = [
+            .png,
+            .tiff,
+            NSPasteboard.PasteboardType("public.jpeg"),
+            NSPasteboard.PasteboardType("public.heic"),
+            NSPasteboard.PasteboardType("public.heif"),
+            NSPasteboard.PasteboardType("com.compuserve.gif"),
+            NSPasteboard.PasteboardType("org.webmproject.webp"),
+            NSPasteboard.PasteboardType("public.webp")
+        ]
+
+        for type in preferredTypes {
+            if let data = pasteboard.data(forType: type), NSImage(data: data) != nil {
+                return data
+            }
+        }
+
+        guard let image = NSImage(pasteboard: pasteboard),
+              image.size.width > 0,
+              image.size.height > 0,
+              let tiff = image.tiffRepresentation else {
+            return nil
+        }
+        return tiff
     }
     
     private func addToHistory(_ item: ClipboardItem) {
@@ -450,10 +475,7 @@ class ClipboardManager: ObservableObject {
             
             // Clean up files for items being removed
             for oldItem in itemsToRemove {
-                if let fileName = oldItem.imageFileName {
-                    let fileURL = ClipboardManager.clipboardDataDirectory.appendingPathComponent(fileName)
-                    try? FileManager.default.removeItem(at: fileURL)
-                }
+                oldItem.discardStoredImage()
             }
             
             self.clipboardHistory.removeAll { existingItem in
@@ -467,10 +489,7 @@ class ClipboardManager: ObservableObject {
             // Keep only the most recent items and clean up old files
             let itemsToDelete = Array(self.clipboardHistory.dropFirst(self.maxHistoryItems))
             for oldItem in itemsToDelete {
-                if let fileName = oldItem.imageFileName {
-                    let fileURL = ClipboardManager.clipboardDataDirectory.appendingPathComponent(fileName)
-                    try? FileManager.default.removeItem(at: fileURL)
-                }
+                oldItem.discardStoredImage()
             }
             
             if self.clipboardHistory.count > self.maxHistoryItems {
@@ -504,7 +523,9 @@ class ClipboardManager: ObservableObject {
     private func cleanupOldFiles() {
         guard let files = try? FileManager.default.contentsOfDirectory(at: ClipboardManager.clipboardDataDirectory, includingPropertiesForKeys: nil) else { return }
         
-        let referencedFiles = Set(clipboardHistory.compactMap { $0.imageFileName })
+        let referencedFiles = Set(
+            clipboardHistory.compactMap(\.imageFileName) + pinnedItems.compactMap(\.imageFileName)
+        )
         
         for file in files {
             let fileName = file.lastPathComponent

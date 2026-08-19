@@ -439,7 +439,7 @@ struct NotchClipboardList: View {
                     Text("No copies yet")
                         .font(.headline)
                         .foregroundStyle(.secondary)
-                    Text("Copy text to see it here")
+                    Text("Copy text or images to see them here")
                         .font(.caption)
                         .foregroundStyle(.secondary.opacity(0.7))
                 }
@@ -529,19 +529,12 @@ struct NotchClipboardItemRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            if item.type == .image, let data = item.getImageData(), let nsImage = NSImage(data: data) {
-                 Image(nsImage: nsImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 32, height: 32)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.1), lineWidth: 0.5))
-            } else {
-                Image(systemName: justCopied ? "checkmark.circle.fill" : item.type.icon)
-                    .font(.system(size: 14))
-                    .foregroundColor(justCopied ? .green : .blue)
-                    .frame(width: 20)
-            }
+            ClipboardItemLeadingPreview(
+                item: item,
+                side: 32,
+                fallbackSystemName: justCopied ? "checkmark.circle.fill" : nil,
+                fallbackColor: justCopied ? .green : .blue
+            )
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.preview)

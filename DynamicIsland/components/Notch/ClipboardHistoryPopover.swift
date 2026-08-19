@@ -122,11 +122,7 @@ struct ClipboardItemRow: View {
     
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            // Type icon
-            Image(systemName: item.type.icon)
-                .font(.system(size: 12))
-                .foregroundColor(.blue)
-                .frame(width: 16)
+            ClipboardItemLeadingPreview(item: item, side: 32)
             
             // Content
             VStack(alignment: .leading, spacing: 2) {

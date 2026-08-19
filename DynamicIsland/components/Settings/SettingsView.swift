@@ -7001,9 +7001,7 @@ struct ClipboardSettings: View {
                         ForEach(clipboardManager.clipboardHistory) { item in
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {
-                                    Image(systemName: item.type.icon)
-                                        .foregroundColor(.blue)
-                                        .frame(width: 16)
+                                    ClipboardItemLeadingPreview(item: item, side: 28)
                                     Text(item.type.displayName)
                                         .font(.caption)
                                         .foregroundColor(.secondary)

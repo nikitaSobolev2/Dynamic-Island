@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import AppKit
 import SwiftUI
 
 enum ClipboardTab: String, CaseIterable {
@@ -82,5 +83,32 @@ struct ClipboardTabButton: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct ClipboardItemLeadingPreview: View {
+    let item: ClipboardItem
+    var side: CGFloat = 36
+    var fallbackSystemName: String?
+    var fallbackColor: Color = .blue
+
+    var body: some View {
+        if let image = item.previewImage() {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fill)
+                .frame(width: side, height: side)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
+                )
+        } else {
+            Image(systemName: fallbackSystemName ?? item.type.icon)
+                .font(.system(size: max(11, side * 0.38)))
+                .foregroundColor(fallbackColor)
+                .frame(width: min(20, side), height: side)
+        }
     }
 }

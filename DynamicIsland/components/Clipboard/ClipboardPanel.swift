@@ -354,11 +354,7 @@ struct ClipboardPanelItemRow: View {
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            // Type icon
-            Image(systemName: item.type.icon)
-                .font(.system(size: 14))
-                .foregroundColor(.blue)
-                .frame(width: 20)
+            ClipboardItemLeadingPreview(item: item, side: 40)
             
             // Content
             VStack(alignment: .leading, spacing: 4) {
