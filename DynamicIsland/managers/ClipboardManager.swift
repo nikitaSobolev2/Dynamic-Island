@@ -398,7 +398,7 @@ class ClipboardManager: ObservableObject {
 
     private func getCurrentClipboardItem() -> ClipboardItem? {
         let pasteboard = NSPasteboard.general
-        let fileURLs = readableFileURLs(from: pasteboard)
+        let fileURLs = declaredFileURLs(from: pasteboard)
 
         if let imageItem = clipboardImageItem(from: fileURLs) {
             return imageItem
@@ -406,6 +406,12 @@ class ClipboardManager: ObservableObject {
 
         if !fileURLs.isEmpty {
             return ClipboardItem(fileURLs: fileURLs.map(\.absoluteString))
+        }
+
+        // Promised / unreadable file copies often include a Quick Look thumbnail.
+        // Do not treat that bitmap as the copied item.
+        if declaresFileCopy(pasteboard) {
+            return nil
         }
 
         if let imageData = imageData(from: pasteboard) {
@@ -432,7 +438,26 @@ class ClipboardManager: ObservableObject {
         return nil
     }
 
-    private func readableFileURLs(from pasteboard: NSPasteboard) -> [URL] {
+    private static let fileCopyPasteboardTypes: Set<NSPasteboard.PasteboardType> = [
+        .fileURL,
+        NSPasteboard.PasteboardType("NSFilenamesPboardType"),
+        NSPasteboard.PasteboardType("com.apple.pasteboard.promised-file-url"),
+        NSPasteboard.PasteboardType("com.apple.pasteboard.promised-file-content-type"),
+        NSPasteboard.PasteboardType("Apple files promise pasteboard type"),
+        NSPasteboard.PasteboardType("NSPromiseContentsPboardType")
+    ]
+
+    private func declaresFileCopy(_ pasteboard: NSPasteboard) -> Bool {
+        let types = pasteboard.types ?? []
+        if types.contains(where: { Self.fileCopyPasteboardTypes.contains($0) }) {
+            return true
+        }
+        return pasteboard.pasteboardItems?.contains { item in
+            item.types.contains(where: { Self.fileCopyPasteboardTypes.contains($0) })
+        } ?? false
+    }
+
+    private func declaredFileURLs(from pasteboard: NSPasteboard) -> [URL] {
         var urls: [URL] = []
 
         let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
@@ -442,7 +467,7 @@ class ClipboardManager: ObservableObject {
 
         if urls.isEmpty, let items = pasteboard.pasteboardItems {
             for item in items {
-                if let raw = item.string(forType: .fileURL), let url = URL(string: raw) {
+                if let url = fileURL(fromPasteboardString: item.string(forType: .fileURL)) {
                     urls.append(url)
                 }
             }
@@ -456,24 +481,38 @@ class ClipboardManager: ObservableObject {
         }
 
         var uniquePaths = Set<String>()
-        return urls.compactMap(resolvedExistingFileURL).filter { url in
+        return urls.compactMap(normalizedFileURL).filter { url in
             uniquePaths.insert(url.path).inserted
         }
     }
 
-    private func resolvedExistingFileURL(_ url: URL) -> URL? {
+    private func fileURL(fromPasteboardString raw: String?) -> URL? {
+        guard let raw, !raw.isEmpty else { return nil }
+        if let url = URL(string: raw), url.isFileURL {
+            return url
+        }
+        let pathURL = URL(fileURLWithPath: raw)
+        return pathURL.isFileURL ? pathURL : nil
+    }
+
+    private func normalizedFileURL(_ url: URL) -> URL? {
         guard url.isFileURL else { return nil }
         let pathURL = (url as NSURL).filePathURL ?? url
-        let standardized = pathURL.standardizedFileURL.resolvingSymlinksInPath()
-        guard FileManager.default.fileExists(atPath: standardized.path) else { return nil }
+        let standardized = pathURL.standardizedFileURL
+        if FileManager.default.fileExists(atPath: standardized.path) {
+            return standardized.resolvingSymlinksInPath()
+        }
         return standardized
     }
 
     private func clipboardImageItem(from fileURLs: [URL]) -> ClipboardItem? {
-        for fileURL in fileURLs where isImageFile(fileURL) {
-            if let imageData = imageData(fromFile: fileURL) {
-                return ClipboardItem(imageData: imageData)
+        for fileURL in fileURLs {
+            guard FileManager.default.fileExists(atPath: fileURL.path),
+                  isImageFile(fileURL),
+                  let imageData = imageData(fromFile: fileURL) else {
+                continue
             }
+            return ClipboardItem(imageData: imageData)
         }
         return nil
     }
