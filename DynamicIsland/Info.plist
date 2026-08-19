@@ -9,14 +9,18 @@
 	</dict>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>Atoll needs screen recording permission to capture screenshots for the AI assistant feature.</string>
+	<key>SUAutomaticallyUpdate</key>
+	<true/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 	<key>SUEnableDownloaderService</key>
 	<true/>
 	<key>SUEnableInstallerLauncherService</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/Ebullioscopic/Atoll/main/Updates/appcast.xml</string>
+	<string>https://raw.githubusercontent.com/nikitaSobolev2/Dynamic-Island/main/Updates/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>q2YQaJ1umGkaIJWMGN9Isj5fx/YlUtxnzHEBqFtfZcg=</string>
+	<string>s2IhIl7jraXn9GBL7CQ2fnsIhl8k6aLwjC0ZIaTaVb4=</string>
 	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict/>

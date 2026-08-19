@@ -1,0 +1,245 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build without creating a GitHub release"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PROJECT: DynamicIsland.xcodeproj
+  SCHEME: DynamicIsland
+  APP_NAME: Atoll
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: macos-15
+    timeout-minutes: 90
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require Sparkle signing key
+        env:
+          SPARKLE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          if [ -z "$SPARKLE_KEY" ]; then
+            echo "::error::Missing SPARKLE_ED_PRIVATE_KEY (EdDSA private key for the update feed)"
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/private_keys"
+          printf '%s\n' "$SPARKLE_KEY" > "$RUNNER_TEMP/private_keys/sparkle_ed.key"
+          chmod 600 "$RUNNER_TEMP/private_keys/sparkle_ed.key"
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            TAG="${GITHUB_REF_NAME}"
+            VERSION="${TAG#v}"
+          else
+            VERSION=$(grep -m1 MARKETING_VERSION DynamicIsland.xcodeproj/project.pbxproj | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+            TAG="v${VERSION}"
+            echo "workflow_dispatch dry build using marketing version ${VERSION}"
+          fi
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::Version must be X.Y.Z (got ${VERSION})"
+            exit 1
+          fi
+          PROJECT_BUILD=$(grep -m1 CURRENT_PROJECT_VERSION DynamicIsland.xcodeproj/project.pbxproj | grep -oE '[0-9]+')
+          PROJECT_BUILD=${PROJECT_BUILD:-1}
+          APPCAST_BUILD=$(grep -o 'sparkle:version>[0-9]\+' Updates/appcast.xml | grep -oE '[0-9]+' | sort -rn | head -1)
+          APPCAST_BUILD=${APPCAST_BUILD:-0}
+          NEXT_FROM_APPCAST=$((APPCAST_BUILD + 1))
+          if [ "$PROJECT_BUILD" -gt "$NEXT_FROM_APPCAST" ]; then
+            BUILD_NUMBER="$PROJECT_BUILD"
+          else
+            BUILD_NUMBER="$NEXT_FROM_APPCAST"
+          fi
+
+          DMG_NAME="DynamicIsland-${VERSION}.dmg"
+          {
+            echo "tag=$TAG"
+            echo "version=$VERSION"
+            echo "build_number=$BUILD_NUMBER"
+            echo "dmg_name=$DMG_NAME"
+          } >> "$GITHUB_OUTPUT"
+          echo "Version ${VERSION} (build ${BUILD_NUMBER})"
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Stamp version
+        run: |
+          xcrun agvtool new-marketing-version "${{ steps.version.outputs.version }}"
+          xcrun agvtool new-version -all "${{ steps.version.outputs.build_number }}"
+
+      - name: Resolve packages
+        run: |
+          xcodebuild -resolvePackageDependencies -project "$PROJECT" -scheme "$SCHEME"
+
+      - name: Build Release
+        run: |
+          xcodebuild \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="" \
+            build
+
+      - name: Copy Bluetooth HUD animations
+        run: |
+          APP_PATH="build/DerivedData/Build/Products/Release/${APP_NAME}.app"
+          DEST="$APP_PATH/Contents/Resources/BluetoothHUDAnimations"
+          mkdir -p "$DEST"
+          cp -n DynamicIsland/BluetoothHUDAnimations/*.mov "$DEST/"
+          echo "Copied $(find "$DEST" -name '*.mov' | wc -l | tr -d ' ') HUD animations"
+
+      - name: Ad-hoc sign
+        run: |
+          APP_PATH="build/DerivedData/Build/Products/Release/${APP_NAME}.app"
+          codesign --force --deep --sign - "$APP_PATH"
+          mkdir -p build/export
+          rm -rf "build/export/${APP_NAME}.app"
+          cp -R "$APP_PATH" "build/export/${APP_NAME}.app"
+
+      - name: Create DMG
+        run: |
+          DMG_NAME="${{ steps.version.outputs.dmg_name }}"
+          npx --yes create-dmg "build/export/${APP_NAME}.app" build/ --overwrite --no-code-sign
+          GENERATED_DMG=$(find build -maxdepth 1 -name "*.dmg" | head -1)
+          if [ -z "$GENERATED_DMG" ]; then
+            echo "::error::create-dmg did not produce a DMG"
+            exit 1
+          fi
+          mv "$GENERATED_DMG" "build/${DMG_NAME}"
+
+      - name: Generate Sparkle appcast
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          DMG_NAME="${{ steps.version.outputs.dmg_name }}"
+          PREFIX="https://github.com/${{ github.repository }}/releases/download/${TAG}/"
+
+          GENERATE_APPCAST=$(find ~/Library/Developer/Xcode/DerivedData build/DerivedData -name generate_appcast -type f 2>/dev/null | head -1)
+          if [ -z "$GENERATE_APPCAST" ]; then
+            curl -fsSL -o "$RUNNER_TEMP/Sparkle.tar.xz" \
+              https://github.com/sparkle-project/Sparkle/releases/download/2.7.1/Sparkle-2.7.1.tar.xz
+            mkdir -p "$RUNNER_TEMP/sparkle"
+            tar -xf "$RUNNER_TEMP/Sparkle.tar.xz" -C "$RUNNER_TEMP/sparkle"
+            GENERATE_APPCAST=$(find "$RUNNER_TEMP/sparkle" -name generate_appcast -type f | head -1)
+          fi
+          if [ -z "$GENERATE_APPCAST" ]; then
+            echo "::error::Sparkle generate_appcast not found"
+            exit 1
+          fi
+
+          mkdir -p build/appcast-staging
+          cp "build/${DMG_NAME}" build/appcast-staging/
+          "$GENERATE_APPCAST" \
+            --ed-key-file "$RUNNER_TEMP/private_keys/sparkle_ed.key" \
+            --download-url-prefix "$PREFIX" \
+            build/appcast-staging
+
+          if [ ! -f build/appcast-staging/appcast.xml ]; then
+            echo "::error::generate_appcast did not write appcast.xml"
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("build/appcast-staging/appcast.xml")
+          text = path.read_text()
+          text = text.replace("<title>Atoll</title>", "<title>Dynamic Island</title>", 1)
+          path.write_text(text)
+          PY
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG_NAME="${{ steps.version.outputs.dmg_name }}"
+          cat > build/release_notes.md <<EOF
+          ## Dynamic Island ${VERSION}
+
+          Build ${{ steps.version.outputs.build_number }}.
+
+          This build is not notarized. After installing, clear Gatekeeper quarantine:
+
+          \`\`\`bash
+          xattr -cr /Applications/Atoll.app
+          \`\`\`
+          EOF
+
+          gh release create "$TAG" \
+            --title "Dynamic Island ${VERSION}" \
+            --notes-file build/release_notes.md \
+            "build/${DMG_NAME}" \
+            build/appcast-staging/appcast.xml
+
+      - name: Publish appcast and Homebrew cask
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG_NAME="${{ steps.version.outputs.dmg_name }}"
+          cp build/appcast-staging/appcast.xml "$RUNNER_TEMP/appcast.xml"
+          cp "build/${DMG_NAME}" "$RUNNER_TEMP/${DMG_NAME}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+
+          cp "$RUNNER_TEMP/appcast.xml" Updates/appcast.xml
+          python3 - "$RUNNER_TEMP/${DMG_NAME}" "$VERSION" <<'PY'
+          import hashlib
+          import pathlib
+          import re
+          import sys
+
+          dmg_path = pathlib.Path(sys.argv[1])
+          version = sys.argv[2]
+          sha256 = hashlib.sha256(dmg_path.read_bytes()).hexdigest()
+          cask_path = pathlib.Path("Casks/dynamic-island.rb")
+          text = cask_path.read_text()
+          text, version_hits = re.subn(r'version "[^"]+"', f'version "{version}"', text, count=1)
+          text, hash_hits = re.subn(r'sha256 "[^"]+"', f'sha256 "{sha256}"', text, count=1)
+          if version_hits != 1 or hash_hits != 1:
+              raise SystemExit("failed to update Casks/dynamic-island.rb")
+          cask_path.write_text(text)
+          PY
+
+          git add Updates/appcast.xml Casks/dynamic-island.rb
+          git commit -m "ci: publish Dynamic Island ${VERSION} appcast and cask [skip ci]" || echo "No appcast/cask changes"
+          git push origin main
+
+      - name: Cleanup secrets
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/private_keys"

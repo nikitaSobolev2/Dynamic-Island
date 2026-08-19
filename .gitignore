@@ -36,6 +36,9 @@ build/
 *.dSYM
 *.dmg
 
+# Sparkle EdDSA private key (never commit)
+.sparkle_ed_private.key
+
 # Temporary files
 *.swp
 *.swo

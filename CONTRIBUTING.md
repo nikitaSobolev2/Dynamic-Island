@@ -14,6 +14,7 @@ Thank you for your interest in contributing to Atoll! We welcome contributions f
 - [Coding Guidelines](#coding-guidelines)
 - [Design Contributions](#design-contributions)
 - [Documentation](#documentation)
+- [Releasing](#releasing)
 - [Code Review process](#code-review-process)
 - [Community & Support](#community--support)
 
@@ -42,8 +43,8 @@ We are committed to fostering a welcoming and inclusive environment. Please read
 	- MacBook with a notch (for full feature testing)
 - **Clone the repo:**
 	```bash
-	git clone https://github.com/Ebullioscopic/Atoll.git
-	cd Atoll
+	git clone https://github.com/nikitaSobolev2/Dynamic-Island.git
+	cd Dynamic-Island
 	open DynamicIsland.xcodeproj
 	```
 - **Build & Run:**
@@ -80,6 +81,19 @@ We are committed to fostering a welcoming and inclusive environment. Please read
 - Improve user guides, API docs, and troubleshooting sections.
 - Translate documentation into other languages.
 - Clarify setup instructions and add usage examples.
+
+## Releasing
+
+Push a version tag to build and publish a GitHub Release. Sparkle and Homebrew then follow that release. Builds are ad-hoc signed (not notarized); users clear quarantine with `xattr -cr /Applications/Atoll.app`.
+
+```bash
+git tag v2.2.0
+git push origin v2.2.0
+```
+
+The app always updates from the latest GitHub Release via `Updates/appcast.xml`. There is no beta/nightly channel.
+
+The only repository secret required is `SPARKLE_ED_PRIVATE_KEY` (EdDSA private key matching `SUPublicEDKey` in `DynamicIsland/Info.plist`). Never commit it.
 
 ## Code review process
 - All pull requests require review from project maintainers before merging.

@@ -3,17 +3,14 @@
 </p>
 <h1 align="center">Atoll - DynamicIsland for macOS</h1>
 <p align="center">
-<a href="https://trendshift.io/repositories/15291" target="_blank"><img src="https://trendshift.io/api/badge/repositories/15291" alt="Ebullioscopic%2FAtoll | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</p>
-<p align="center">
-  <a href="https://github.com/Ebullioscopic/Atoll/stargazers">
-    <img src="https://img.shields.io/github/stars/Ebullioscopic/Atoll?style=social" alt="GitHub stars"/>
+  <a href="https://github.com/nikitaSobolev2/Dynamic-Island/stargazers">
+    <img src="https://img.shields.io/github/stars/nikitaSobolev2/Dynamic-Island?style=social" alt="GitHub stars"/>
   </a>
-  <a href="https://github.com/Ebullioscopic/Atoll/network/members">
-    <img src="https://img.shields.io/github/forks/Ebullioscopic/Atoll?style=social" alt="GitHub forks"/>
+  <a href="https://github.com/nikitaSobolev2/Dynamic-Island/network/members">
+    <img src="https://img.shields.io/github/forks/nikitaSobolev2/Dynamic-Island?style=social" alt="GitHub forks"/>
   </a>
-  <a href="https://github.com/Ebullioscopic/Atoll/releases">
-    <img src="https://img.shields.io/github/downloads/Ebullioscopic/Atoll/total?label=Downloads" alt="GitHub downloads"/>
+  <a href="https://github.com/nikitaSobolev2/Dynamic-Island/releases">
+    <img src="https://img.shields.io/github/downloads/nikitaSobolev2/Dynamic-Island/total?label=Downloads" alt="GitHub downloads"/>
   </a>
   <a href="https://discord.gg/PaqFkRTDF8">
     <img src="https://dcbadge.limes.pink/api/server/https://discord.gg/PaqFkRTDF8?style=flat" alt="Discord server"/>
@@ -21,11 +18,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sponsors/Ebullioscopic">
-    <img src="https://img.shields.io/badge/Sponsor-Ebullioscopic-ff69b4?style=for-the-badge&logo=github" alt="Sponsor Ebullioscopic"/>
+  <a href="https://github.com/sponsors/nikitaSobolev2">
+    <img src="https://img.shields.io/badge/Sponsor-nikitaSobolev2-ff69b4?style=for-the-badge&logo=github" alt="Sponsor nikitaSobolev2"/>
   </a>
-  <a href="https://github.com/Ebullioscopic/Atoll/releases/latest">
-    <img src="https://img.shields.io/badge/Download-Atoll%20for%20macOS-0A84FF?style=for-the-badge&logo=apple" alt="Download Atoll for macOS"/>
+  <a href="https://github.com/nikitaSobolev2/Dynamic-Island/releases/latest">
+    <img src="https://img.shields.io/badge/Download-Dynamic%20Island%20for%20macOS-0A84FF?style=for-the-badge&logo=apple" alt="Download Dynamic Island for macOS"/>
   </a>
   <a href="https://www.buymeacoffee.com/kryoscopic">
     <img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-kryoscopic-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=000000" alt="Buy Me a Coffee for kryoscopic"/>
@@ -70,9 +67,36 @@ Atoll turns the MacBook notch into a focused command surface for media, system i
 - Permissions as needed: Accessibility, Camera, Calendar, Screen Recording, Music.
 
 ## Installation
-1) Download the latest DMG [here](https://github.com/Ebullioscopic/Atoll/releases/latest).
-2) Open the DMG and drag Atoll into Applications.
-3) Launch Atoll and grant the requested permissions.
+
+Builds are not notarized. After installing, macOS may block the app until you remove the quarantine flag.
+
+### Homebrew
+
+```bash
+brew tap nikitaSobolev2/dynamic-island https://github.com/nikitaSobolev2/Dynamic-Island
+brew install --cask dynamic-island
+xattr -cr /Applications/Atoll.app
+```
+
+### GitHub Release
+
+1. Download the latest DMG from [Releases](https://github.com/nikitaSobolev2/Dynamic-Island/releases/latest).
+2. Open the DMG and drag Atoll into Applications.
+3. Clear Gatekeeper quarantine, then launch Atoll:
+
+```bash
+xattr -cr /Applications/Atoll.app
+```
+
+### Build from source
+
+```bash
+git clone https://github.com/nikitaSobolev2/Dynamic-Island.git
+cd Dynamic-Island
+open DynamicIsland.xcodeproj
+```
+
+Select your Mac as the run destination and build (Cmd+R). Grant the requested permissions.
 
 ## Quick Start
 - Hover near the notch to expand; click to enter controls.
@@ -113,22 +137,16 @@ Atoll builds upon the work of several open-source projects and draws inspiration
 - [**SkyLightWindow**](https://github.com/Lakr233/SkyLightWindow) - window rendering for Lock Screen Widgets
 
 - Wick - Thanks Nate for allowing us to replicate the iOS like Timer design for the Lock Screen Widget
+
 ## Contributors
 
-<a href="https://github.com/Ebullioscopic/Atoll/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=Ebullioscopic/Atoll" />
+<a href="https://github.com/nikitaSobolev2/Dynamic-Island/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=nikitaSobolev2/Dynamic-Island" />
 </a>
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Ebullioscopic/Atoll&type=timeline&legend=top-left)](https://www.star-history.com/#Ebullioscopic/Atoll&type=timeline&legend=top-left)
-
-## Updating Existing Clones
-If you previously cloned DynamicIsland, update the remote to track the Atoll repository:
-
-```bash
-git remote set-url origin https://github.com/Ebullioscopic/Atoll.git
-```
+[![Star History Chart](https://api.star-history.com/svg?repos=nikitaSobolev2/Dynamic-Island&type=timeline&legend=top-left)](https://www.star-history.com/#nikitaSobolev2/Dynamic-Island&type=timeline&legend=top-left)
 
 A heartfelt thanks to [TheBoredTeam](https://github.com/TheBoredTeam) for being supportive and being totally awesome, Atoll would not have been possible without Boring.Notch
 
