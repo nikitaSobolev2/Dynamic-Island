@@ -28,6 +28,8 @@ struct DynamicIslandHeader: View {
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
+    @ObservedObject var voiceChatManager = VoiceChatManager.shared
+    @ObservedObject var privacyManager = PrivacyIndicatorManager.shared
     @State private var showClipboardPopover = false
     @State private var showColorPickerPopover = false
     @State private var showTimerPopover = false
@@ -40,36 +42,37 @@ struct DynamicIslandHeader: View {
     @Default(.showMinimalisticBatteryIndicator) var showMinimalisticBatteryIndicator
     
     var body: some View {
-        HStack(spacing: 0) {
-            if !vm.usesMinimalisticLayout {
-                HStack {
-                    let shouldShowTabs = coordinator.alwaysShowTabs || vm.notchState == .open || !shelfState.items.isEmpty
-                    if shouldShowTabs {
-                        TabSelectionView()
+        ZStack {
+            HStack(spacing: 0) {
+                if !vm.usesMinimalisticLayout {
+                    HStack {
+                        let shouldShowTabs = coordinator.alwaysShowTabs || vm.notchState == .open || !shelfState.items.isEmpty
+                        if shouldShowTabs {
+                            TabSelectionView()
+                        }
                     }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .opacity(vm.notchState == .closed ? 0 : 1)
-                .blur(radius: vm.notchState == .closed ? 20 : 0)
-                .animation(.smooth.delay(0.1), value: vm.notchState)
-                .zIndex(2)
-                .transition(.opacity)
-            }
-
-            if vm.notchState == .open && !vm.usesMinimalisticLayout {
-                let spacerWidth = min(vm.closedNotchSize.width, 300)
-                Rectangle()
-                    .fill(NSScreen.screens
-                        .first(where: { $0.localizedName == coordinator.selectedScreen })?.safeAreaInsets.top ?? 0 > 0 ? .black : .clear)
-                    .frame(width: spacerWidth)
-                    .mask {
-                        NotchShape()
-                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .opacity(vm.notchState == .closed ? 0 : 1)
+                    .blur(radius: vm.notchState == .closed ? 20 : 0)
+                    .animation(.smooth.delay(0.1), value: vm.notchState)
+                    .zIndex(2)
                     .transition(.opacity)
-            }
+                }
 
-            HStack(spacing: 4) {
                 if vm.notchState == .open && !vm.usesMinimalisticLayout {
+                    let spacerWidth = min(vm.closedNotchSize.width, 300)
+                    Rectangle()
+                        .fill(NSScreen.screens
+                            .first(where: { $0.localizedName == coordinator.selectedScreen })?.safeAreaInsets.top ?? 0 > 0 ? .black : .clear)
+                        .frame(width: spacerWidth)
+                        .mask {
+                            NotchShape()
+                        }
+                        .transition(.opacity)
+                }
+
+                HStack(spacing: 4) {
+                    if vm.notchState == .open && !vm.usesMinimalisticLayout {
                     if Defaults[.showMirror] {
                         Button(action: {
                             vm.toggleCameraPreview()
@@ -267,9 +270,20 @@ struct DynamicIslandHeader: View {
             .blur(radius: vm.notchState == .closed ? 20 : 0)
             .animation(.smooth.delay(0.1), value: vm.notchState)
             .zIndex(2)
+            .foregroundColor(.gray)
+            }
+
+            if shouldShowMinimalisticVoiceControls {
+                HStack(spacing: 0) {
+                    VoiceChatHeaderControls()
+                        .padding(.leading, 6)
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .zIndex(3)
+            }
         }
         .animation(.spring(response: 0.42, dampingFraction: 0.8), value: vm.usesMinimalisticLayout)
-        .foregroundColor(.gray)
         .environmentObject(vm)
         .onChange(of: coordinator.shouldToggleClipboardPopover) { _ in
             // Only toggle if clipboard is enabled
@@ -316,6 +330,13 @@ private extension DynamicIslandHeader {
             && Defaults[.showClipboardIcon]
             && Defaults[.enableColorPickerFeature]
             && Defaults[.enableTimerFeature]
+    }
+
+    var shouldShowMinimalisticVoiceControls: Bool {
+        vm.notchState == .open
+            && vm.usesMinimalisticLayout
+            && (voiceChatManager.isSessionActive
+                || VoiceChatManager.shouldShowControls(microphoneActive: privacyManager.microphoneActive))
     }
 }
 

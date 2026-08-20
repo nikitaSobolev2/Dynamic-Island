@@ -47,6 +47,7 @@ struct ContentView: View {
     @ObservedObject var statsManager = StatsManager.shared
     @ObservedObject var recordingManager = ScreenRecordingManager.shared
     @ObservedObject var privacyManager = PrivacyIndicatorManager.shared
+    @ObservedObject var voiceChatManager = VoiceChatManager.shared
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
     @ObservedObject var lockScreenManager = LockScreenManager.shared
     @ObservedObject var capsLockManager = CapsLockManager.shared
@@ -78,6 +79,8 @@ struct ContentView: View {
     @Default(.showDoNotDisturbIndicator) var showDoNotDisturbIndicator
     @Default(.enableScreenRecordingDetection) var enableScreenRecordingDetection
     @Default(.enableCapsLockIndicator) var enableCapsLockIndicator
+    @Default(.enableVoiceChatControls) var enableVoiceChatControls
+    @Default(.enableMicrophoneDetection) var enableMicrophoneDetection
     @Default(.enableExtensionLiveActivities) var enableExtensionLiveActivities
     @Default(.showStandardMediaControls) var showStandardMediaControls
     @Default(.externalDisplayStyle) var externalDisplayStyle
@@ -435,6 +438,12 @@ struct ContentView: View {
         if case .failed = localSendService.transferState { return true }
         if case .rejected = localSendService.transferState { return true }
         return false
+    }
+
+    /// Closed-notch voice controls when the Mac microphone is actually in use.
+    private var isVoiceChatLiveActivityVisible: Bool {
+        VoiceChatManager.shouldShowControls(microphoneActive: privacyManager.microphoneActive)
+            && !vm.hideOnClosed
     }
 
     /// Pill shape for Dynamic Island mode with animated corner radius transitions.
@@ -871,6 +880,8 @@ struct ContentView: View {
                       } else if vm.notchState == .closed && capsLockManager.isCapsLockActive && Defaults[.enableCapsLockIndicator] && !vm.hideOnClosed && !lockScreenManager.isLocked {
                           InlineHUD(type: .constant(.capsLock), value: .constant(1.0), icon: .constant(""), hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(AnyTransition.move(edge: .trailing).combined(with: .opacity))
+                      } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .privacy) && vm.notchState == .closed && isVoiceChatLiveActivityVisible {
+                          VoiceChatLiveActivity()
                       } else if canShowMusicDuringExpansion && musicPairingEligible {
                           MusicLiveActivity(secondary: musicSecondary)
                       } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .timer) && vm.notchState == .closed && timerManager.isTimerActive && coordinator.timerLiveActivityEnabled && !vm.hideOnClosed {

@@ -143,7 +143,7 @@ var minimalisticOpenNotchSize: CGSize {
     if Defaults[.enableLyrics] {
         size.height += minimalisticLyricsExtraHeight
     }
-    
+
     let reminderCount = ReminderLiveActivityManager.shared.activeWindowReminders.count
     if reminderCount > 0 {
         let reminderHeight = ReminderLiveActivityManager.additionalHeight(forRowCount: reminderCount)

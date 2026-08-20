@@ -732,6 +732,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .liveActivities, title: "Show Focus Label", keywords: ["focus label", "text"], highlightID: SettingsTab.liveActivities.highlightID(for: "Show Focus Label")),
             SettingsSearchEntry(tab: .liveActivities, title: "Enable Camera Detection", keywords: ["camera", "privacy indicator"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Camera Detection")),
             SettingsSearchEntry(tab: .liveActivities, title: "Enable Microphone Detection", keywords: ["microphone", "privacy"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Microphone Detection")),
+            SettingsSearchEntry(tab: .liveActivities, title: "Enable Voice Chat Controls", keywords: ["voice chat", "mute", "microphone", "speaker"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable Voice Chat Controls")),
             SettingsSearchEntry(tab: .liveActivities, title: "Enable music live activity", keywords: ["music", "now playing"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable music live activity")),
             SettingsSearchEntry(tab: .liveActivities, title: "Enable reminder live activity", keywords: ["reminder", "live activity"], highlightID: SettingsTab.liveActivities.highlightID(for: "Enable reminder live activity")),
 
@@ -3969,11 +3970,13 @@ struct LiveActivitiesSettings: View {
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
     @ObservedObject var recordingManager = ScreenRecordingManager.shared
     @ObservedObject var privacyManager = PrivacyIndicatorManager.shared
+    @ObservedObject var voiceChatManager = VoiceChatManager.shared
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
     @ObservedObject private var fullDiskAccessPermission = FullDiskAccessPermissionStore.shared
 
     @Default(.enableScreenRecordingDetection) var enableScreenRecordingDetection
     @Default(.enableDoNotDisturbDetection) var enableDoNotDisturbDetection
+    @Default(.enableMicrophoneDetection) var enableMicrophoneDetection
     @Default(.focusIndicatorNonPersistent) var focusIndicatorNonPersistent
     @Default(.capsLockIndicatorTintMode) var capsLockTintMode
 
@@ -4175,6 +4178,32 @@ struct LiveActivitiesSettings: View {
                 Text("Privacy Indicators")
             } footer: {
                 Text("Shows green camera icon and yellow microphone icon when in use. Uses event-driven CoreAudio and CoreMediaIO APIs.")
+            }
+
+            Section {
+                Defaults.Toggle(key: .enableVoiceChatControls) {
+                    Text("Enable Voice Chat Controls")
+                }
+                .disabled(!enableMicrophoneDetection)
+                .settingsHighlight(id: highlightID("Enable Voice Chat Controls"))
+
+                HStack {
+                    Text("Microphone")
+                    Spacer()
+                    Text(voiceChatManager.isMicrophoneMuted ? "Muted" : "Unmuted")
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Text("Speakers")
+                    Spacer()
+                    Text(voiceChatManager.isOutputMuted ? "Muted" : "Unmuted")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Voice Chat Controls")
+            } footer: {
+                Text("Mutes this Mac’s microphone and speakers, not Discord/Meet’s own mute.")
             }
 
             Section {

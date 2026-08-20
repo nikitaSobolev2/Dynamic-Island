@@ -220,6 +220,7 @@ class PrivacyIndicatorManager: ObservableObject {
         }
         
         // Screen recording is already monitored by ScreenRecordingManager
+        VoiceChatManager.shared.start()
         print("PrivacyIndicatorManager: ✅ All monitors started")
     }
     
