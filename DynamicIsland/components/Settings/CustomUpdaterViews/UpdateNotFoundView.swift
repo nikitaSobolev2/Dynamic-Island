@@ -16,24 +16,15 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import Defaults
 import SwiftUI
 
 /// SwiftUI view displayed when no update is available.
-/// Shows a checkmark animation with "You're up to date!" message,
-/// current version, and channel information.
+/// Shows a checkmark animation with "You're up to date!" message
+/// and the current version.
 struct UpdateNotFoundView: View {
     @ObservedObject var state: UpdateUIState
     @State private var showCheckmark: Bool = false
     @State private var ringScale: CGFloat = 0.5
-
-    private var channel: UpdateChannel {
-        Defaults[.updateChannel]
-    }
-
-    private var channelColor: Color {
-        Color(channel.badgeColor)
-    }
 
     var body: some View {
         VStack(spacing: 20) {
@@ -83,19 +74,11 @@ struct UpdateNotFoundView: View {
                 Text("Atoll \(Bundle.main.releaseVersionNumber ?? "Unknown")")
                     .font(.subheadline)
                     .foregroundStyle(.primary)
-
-                HStack(spacing: 4) {
-                    Image(systemName: channel.badgeIcon)
-                        .font(.caption2)
-                    Text("\(channel.displayName) channel")
-                        .font(.caption)
-                }
-                .foregroundStyle(channelColor)
             }
             .opacity(showCheckmark ? 1.0 : 0)
             .animation(.easeIn(duration: 0.3).delay(0.5), value: showCheckmark)
 
-            Text("Atoll will automatically check for updates periodically.")
+            Text("Atoll automatically checks the latest GitHub Release.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)

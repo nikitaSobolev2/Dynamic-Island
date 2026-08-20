@@ -16,24 +16,17 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import Defaults
 import SwiftUI
 
 /// SwiftUI view for download and installation progress.
 /// Features a circular progress indicator with percentage, download speed,
-/// animated phase transitions, and a gradient progress bar matching the channel color.
+/// animated phase transitions, and a gradient progress bar.
 struct UpdateProgressView: View {
     @ObservedObject var state: UpdateUIState
     @State private var pulseScale: CGFloat = 1.0
     @State private var rotationAngle: Double = 0
 
-    private var channel: UpdateChannel {
-        Defaults[.updateChannel]
-    }
-
-    private var channelColor: Color {
-        Color(channel.badgeColor)
-    }
+    private let channelColor = Color.accentColor
 
     private var progressPercent: Int {
         Int(state.progress * 100)

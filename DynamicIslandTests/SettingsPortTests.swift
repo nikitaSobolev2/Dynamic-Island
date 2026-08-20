@@ -120,6 +120,14 @@ final class SettingsPortTests: XCTestCase {
         )
     }
 
+    func testSparkleFeedURLUsesLatestGitHubRelease() {
+        let feedURL = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String
+        XCTAssertEqual(
+            feedURL,
+            "https://raw.githubusercontent.com/nikitaSobolev2/Dynamic-Island/main/Updates/appcast.xml"
+        )
+    }
+
     private func makeEvent() -> EventModel {
         EventModel(
             id: "event-id",

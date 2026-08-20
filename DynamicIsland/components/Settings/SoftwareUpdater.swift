@@ -75,6 +75,12 @@ struct UpdaterSettingsView: View {
                 }
         } header: {
             Text("Software updates")
+        } footer: {
+            Text("Checks the latest GitHub Release. There are no beta or nightly channels.")
+        }
+        .onAppear {
+            automaticallyChecksForUpdates = updater.automaticallyChecksForUpdates
+            automaticallyDownloadsUpdates = updater.automaticallyDownloadsUpdates
         }
     }
 }
