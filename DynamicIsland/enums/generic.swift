@@ -79,6 +79,7 @@ public enum NotchViews {
     case colorPicker
     case notes
     case clipboard
+    case promptStash
     case terminal
     case extensionExperience
 }

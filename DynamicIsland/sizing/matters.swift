@@ -87,6 +87,11 @@ func enabledStandardTabCount() -> Int {
         count += 1
     }
 
+    // Prompts tab
+    if Defaults[.enablePromptStash] {
+        count += 1
+    }
+
     // Terminal tab
     if Defaults[.enableTerminalFeature] {
         count += 1

@@ -742,6 +742,13 @@ struct AIModel: Codable, Identifiable, Defaults.Serializable {
     }
 }
 
+struct PromptStashItem: Identifiable, Codable, Defaults.Serializable, Hashable {
+    var id: UUID
+    var title: String
+    var content: String
+    var createdAt: Date
+}
+
 struct NoteItem: Codable, Identifiable, Defaults.Serializable, Hashable {
     var id: UUID = UUID()
     var title: String
@@ -1327,6 +1334,10 @@ extension Defaults.Keys {
     static let enableAppleNotesSync = Key<Bool>("enableAppleNotesSync", default: false)
     static let appleNotesLastSyncDate = Key<Date?>("appleNotesLastSyncDate", default: nil)
     static let showSongMetadataInClosedNotch = Key<Bool>("showSongMetadataInClosedNotch", default: false)
+
+    // MARK: Prompt Stash Feature
+    static let enablePromptStash = Key<Bool>("enablePromptStash", default: false)
+    static let savedPromptStash = Key<[PromptStashItem]>("savedPromptStash", default: [])
     
     // Helper to determine the default media controller based on macOS version
     static var defaultMediaController: MediaControllerType {

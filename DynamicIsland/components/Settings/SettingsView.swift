@@ -65,6 +65,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case shelf
     case shortcuts
     case notes
+    case promptStash
     case terminal
     case about
 
@@ -76,7 +77,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .general, .appearance:                                          return .core
         case .media, .liveActivities, .lockScreen, .devices:                 return .mediaAndDisplay
         case .hudAndOSD, .battery:                                           return .system
-        case .timer, .calendar, .notes:                                      return .productivity
+        case .timer, .calendar, .notes, .promptStash:                         return .productivity
         case .clipboard, .screenAssistant, .colorPicker, .shelf,
              .downloads, .shortcuts:                                         return .utilities
         case .stats, .terminal:                                              return .developer
@@ -106,6 +107,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shelf: return String(localized: "Shelf")
         case .shortcuts: return String(localized: "Shortcuts")
         case .notes: return String(localized: "Notes")
+        case .promptStash: return String(localized: "Prompt Stash")
         case .terminal: return String(localized: "Terminal")
         case .about: return String(localized: "About")
         }
@@ -132,6 +134,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shelf: return "books.vertical"
         case .shortcuts: return "keyboard"
         case .notes: return "note.text"
+        case .promptStash: return "text.quote"
         case .terminal: return "apple.terminal"
         case .about: return "info.circle"
         }
@@ -158,6 +161,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .shelf: return .brown
         case .shortcuts: return .orange
         case .notes: return Color(red: 0.979, green: 0.716, blue: 0.153, opacity: 1.000)
+        case .promptStash: return Color(red: 0.55, green: 0.48, blue: 0.95)
         case .terminal: return Color(red: 0.2, green: 0.8, blue: 0.4)
         case .about: return .secondary
         }
@@ -497,6 +501,7 @@ struct SettingsView: View {
             .timer,
             .calendar,
             .notes,
+            .promptStash,
             // Utilities
             .clipboard,
             .screenAssistant,
@@ -795,6 +800,8 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .calendar, title: "Enable third-party calendar app launch", keywords: ["fantastical", "notion", "calendar app"], highlightID: SettingsTab.calendar.highlightID(for: "Enable third-party calendar app launch")),
             SettingsSearchEntry(tab: .timer, title: "Custom timer style", keywords: ["timer", "ruler", "manual"], highlightID: SettingsTab.timer.highlightID(for: "Custom timer style")),
             SettingsSearchEntry(tab: .notes, title: "Sync with Apple Notes", keywords: ["notes", "apple notes", "sync"], highlightID: SettingsTab.notes.highlightID(for: "Sync with Apple Notes")),
+            SettingsSearchEntry(tab: .promptStash, title: "Enable Prompt Stash", keywords: ["prompts", "stash", "snippets", "prompt"], highlightID: SettingsTab.promptStash.highlightID(for: "Enable Prompt Stash")),
+            SettingsSearchEntry(tab: .promptStash, title: "Clear All", keywords: ["prompts", "clear", "delete"], highlightID: SettingsTab.promptStash.highlightID(for: "Clear All")),
             SettingsSearchEntry(tab: .stats, title: "Enable LLM Usage Monitor", keywords: ["llm", "usage", "tokens", "claude", "cursor"], highlightID: SettingsTab.stats.highlightID(for: "Enable LLM Usage Monitor")),
             SettingsSearchEntry(tab: .about, title: "Automatically check for updates", keywords: ["sparkle", "updates", "github", "autoupdate"], highlightID: SettingsTab.about.highlightID(for: "Automatically check for updates")),
             SettingsSearchEntry(tab: .media, title: "Auto-hide inactive notch media player", keywords: ["auto hide", "inactive", "placeholder", "notch media"], highlightID: SettingsTab.media.highlightID(for: "Auto-hide inactive notch media player")),
@@ -946,7 +953,7 @@ struct SettingsView: View {
 
     private func isTabVisible(_ tab: SettingsTab) -> Bool {
         switch tab {
-        case .timer, .stats, .clipboard, .screenAssistant, .colorPicker, .shelf, .notes, .terminal:
+        case .timer, .stats, .clipboard, .screenAssistant, .colorPicker, .shelf, .notes, .promptStash, .terminal:
             return !enableMinimalisticUI
         default:
             return true
@@ -1031,6 +1038,10 @@ struct SettingsView: View {
         case .notes:
             SettingsForm(tab: .notes) {
                 NotesSettingsView()
+            }
+        case .promptStash:
+            SettingsForm(tab: .promptStash) {
+                PromptStashSettingsView()
             }
         case .terminal:
             SettingsForm(tab: .terminal) {

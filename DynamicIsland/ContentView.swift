@@ -163,6 +163,10 @@ struct ContentView: View {
             return CGSize(width: baseSize.width, height: resolvedHeight)
         }
 
+        if coordinator.currentView == .promptStash {
+            return CGSize(width: baseSize.width, height: max(baseSize.height, 240))
+        }
+
         if coordinator.currentView == .terminal {
             // Dynamic height: up to terminalMaxHeightFraction of screen, min 300pt
             let screenHeight = NSScreen.main?.visibleFrame.height ?? 800
@@ -1025,6 +1029,8 @@ struct ContentView: View {
                                 NotchNotesView()
                             case .clipboard:
                                 NotchNotesView()
+                            case .promptStash:
+                                NotchPromptStashView()
                             case .terminal:
                                 NotchTerminalView()
                             case .extensionExperience:
