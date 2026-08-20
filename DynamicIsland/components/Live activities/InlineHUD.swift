@@ -80,6 +80,19 @@ private struct LoopingVideoIcon: NSViewRepresentable {
     }
 }
 
+struct AirPodsListeningModeSymbol: View {
+    let mode: AirPodsListeningMode
+    var size: CGFloat = 15
+
+    var body: some View {
+        Image(systemName: mode.sfSymbol)
+            .font(.system(size: size, weight: .medium))
+            .symbolRenderingMode(.hierarchical)
+            .contentTransition(.symbolEffect)
+            .frame(width: size + 2, height: size + 2)
+    }
+}
+
 struct InlineHUD: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @Binding var type: SneakContentType
@@ -103,14 +116,31 @@ struct InlineHUD: View {
     @ObservedObject var bluetoothManager = BluetoothAudioManager.shared
     
     @State private var displayName: String = ""
+
+    static func airPodsListeningModeWidth(
+        closedNotchWidth: CGFloat,
+        gestureProgress: CGFloat,
+        minimalistic: Bool
+    ) -> CGFloat {
+        let leadingWidth: CGFloat = minimalistic ? 36 : 44
+        let trailingWidth: CGFloat = minimalistic ? 136 : 180
+        let centerWidth = max(closedNotchWidth - 20, 0)
+        return leadingWidth + gestureProgress / 2 + centerWidth + trailingWidth + gestureProgress / 2
+    }
     
     var body: some View {
         let useCircularIndicator = useCircularBluetoothBatteryIndicator
-        let hasBatteryLevel = value > 0
+        let listeningModeEvent = bluetoothManager.activeListeningModeEvent
+        let listeningMode = listeningModeEvent?.mode ?? (type == .bluetoothAudio && value < 0 ? AirPodsListeningMode.fromHUDSymbol(icon) : nil)
+        let isListeningModeEvent = type == .bluetoothAudio && listeningMode != nil
+        let hasBatteryLevel = value > 0 && !isListeningModeEvent
         let capsLockAccentColor = capsLockTintMode.color
 
         let baseInfoWidth: CGFloat = {
             if type == .bluetoothAudio {
+                if isListeningModeEvent {
+                    return enableMinimalisticUI ? 36 : 44
+                }
                 if showBluetoothDeviceNameMarquee {
                     return enableMinimalisticUI ? 128 : 140
                 }
@@ -129,6 +159,9 @@ struct InlineHUD: View {
             if !hoverAnimation { width -= 8 }
             let minimum: CGFloat = {
                 if type == .bluetoothAudio {
+                    if isListeningModeEvent {
+                        return enableMinimalisticUI ? 32 : 38
+                    }
                     if showBluetoothDeviceNameMarquee {
                         return enableMinimalisticUI ? 112 : 120
                     }
@@ -147,6 +180,9 @@ struct InlineHUD: View {
         let baseTrailingWidth: CGFloat = {
             if type == .bluetoothAudio {
                 if !hasBatteryLevel {
+                    if isListeningModeEvent {
+                        return enableMinimalisticUI ? 136 : 180
+                    }
                     return showBluetoothDeviceNameMarquee ? (enableMinimalisticUI ? 104 : 118) : (enableMinimalisticUI ? 74 : 88)
                 }
 
@@ -173,6 +209,9 @@ struct InlineHUD: View {
             let minimum: CGFloat = {
                 if type == .bluetoothAudio {
                     if !hasBatteryLevel {
+                        if isListeningModeEvent {
+                            return enableMinimalisticUI ? 128 : 172
+                        }
                         return showBluetoothDeviceNameMarquee ? (enableMinimalisticUI ? 96 : 110) : (enableMinimalisticUI ? 62 : 88)
                     }
 
@@ -231,9 +270,14 @@ struct InlineHUD: View {
                                 .contentTransition(.interpolate)
                                 .frame(width: 20, height: 15, alignment: .center)
                         case .bluetoothAudio:
-                            if useBluetoothHUD3DIcon,
+                            if let listeningMode {
+                                AirPodsListeningModeSymbol(mode: listeningMode)
+                                    .contentTransition(.interpolate)
+                                    .frame(width: 20, height: 15, alignment: .center)
+                            } else if useBluetoothHUD3DIcon,
                                let deviceType = bluetoothManager.lastConnectedDevice?.deviceType,
-                               let url = Bundle.main.url(forResource: deviceType.inlineHUDAnimationBaseName, withExtension: "mov") {
+                               let url = Bundle.main.url(forResource: deviceType.inlineHUDAnimationBaseName, withExtension: "mov", subdirectory: "BluetoothHUDAnimations")
+                                      ?? Bundle.main.url(forResource: deviceType.inlineHUDAnimationBaseName, withExtension: "mov") {
                                 LoopingVideoIcon(url: url, size: CGSize(width: 20, height: 20))
                                     .frame(width: 20, height: 20, alignment: .center)
                             } else {
@@ -257,7 +301,9 @@ struct InlineHUD: View {
                 
                 // Use marquee text for device names to handle long names
                 if type == .bluetoothAudio {
-                    if showBluetoothDeviceNameMarquee {
+                    if isListeningModeEvent {
+                        EmptyView()
+                    } else if showBluetoothDeviceNameMarquee {
                         MarqueeText(
                             $displayName,
                             font: .system(size: 13, weight: .medium),
@@ -313,7 +359,21 @@ struct InlineHUD: View {
                             .contentTransition(.interpolate)
                     }
                 } else if (type == .bluetoothAudio) {
-                    if hasBatteryLevel {
+                    if let listeningMode {
+                        let listeningModeTextWidth: CGFloat = enableMinimalisticUI ? 96 : 124
+                        Text(listeningMode.displayName)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                            .truncationMode(.tail)
+                            .allowsTightening(true)
+                            .frame(
+                                width: min(max(trailingWidth - 44, 64), listeningModeTextWidth),
+                                alignment: .trailing
+                            )
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    } else if hasBatteryLevel {
                         let indicatorSpacing: CGFloat = {
                             if useCircularIndicator {
                                 return showBluetoothBatteryPercentageText ? 8 : 2

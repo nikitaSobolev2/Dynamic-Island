@@ -29,6 +29,16 @@
 		7EF19C172F577040005B9929 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 7EF19C162F577040005B9929 /* SwiftTerm */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		8A1B2C3D4E5F60718293A4BB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F54406DF2CD4987A00C7AFD9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F54406E62CD4987A00C7AFD9;
+			remoteInfo = DynamicIsland;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXCopyFilesBuildPhase section */
 		7EA69B1B2F5AE13500EB2D16 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
@@ -55,6 +65,7 @@
 		7EE1D73E2E6B1E1200997219 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		F4C1DD09EC134302938E84F6 /* MediaRemoteAdapter.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaRemoteAdapter.framework; path = Frameworks/MediaRemoteAdapter.framework; sourceTree = SOURCE_ROOT; };
 		F54406E72CD4987A00C7AFD9 /* Atoll.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Atoll.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8A1B2C3D4E5F60718293A4B1 /* DynamicIslandTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DynamicIslandTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -105,6 +116,11 @@
 			path = DynamicIsland;
 			sourceTree = "<group>";
 		};
+		8A1B2C3D4E5F60718293A4B2 /* DynamicIslandTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DynamicIslandTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -125,6 +141,13 @@
 				7E6118152E24071E0050006C /* Sparkle in Frameworks */,
 				7E288D122F1659EF0020C117 /* AtollExtensionKit in Frameworks */,
 				7E6118142E24071E0050006C /* LaunchAtLogin in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A1B2C3D4E5F60718293A4B5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -172,6 +195,7 @@
 				7E81304F2E3FB42700E08F3F /* Frameworks */,
 				7E81303F2E3FB40500E08F3F /* mediaremote-adapter */,
 				F54406E92CD4987A00C7AFD9 /* DynamicIsland */,
+				8A1B2C3D4E5F60718293A4B2 /* DynamicIslandTests */,
 				F54406E82CD4987A00C7AFD9 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -180,6 +204,7 @@
 			isa = PBXGroup;
 			children = (
 				F54406E72CD4987A00C7AFD9 /* Atoll.app */,
+				8A1B2C3D4E5F60718293A4B1 /* DynamicIslandTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -187,6 +212,27 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		8A1B2C3D4E5F60718293A4B3 /* DynamicIslandTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8A1B2C3D4E5F60718293A4B9 /* Build configuration list for PBXNativeTarget "DynamicIslandTests" */;
+			buildPhases = (
+				8A1B2C3D4E5F60718293A4B4 /* Sources */,
+				8A1B2C3D4E5F60718293A4B5 /* Frameworks */,
+				8A1B2C3D4E5F60718293A4B6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8A1B2C3D4E5F60718293A4BA /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				8A1B2C3D4E5F60718293A4B2 /* DynamicIslandTests */,
+			);
+			name = DynamicIslandTests;
+			productName = DynamicIslandTests;
+			productReference = 8A1B2C3D4E5F60718293A4B1 /* DynamicIslandTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		F54406E62CD4987A00C7AFD9 /* DynamicIsland */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F54406F62CD4987B00C7AFD9 /* Build configuration list for PBXNativeTarget "DynamicIsland" */;
@@ -233,6 +279,9 @@
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					8A1B2C3D4E5F60718293A4B3 = {
+						CreatedOnToolsVersion = 16.0;
+					};
 					F54406E62CD4987A00C7AFD9 = {
 						CreatedOnToolsVersion = 16.0;
 					};
@@ -271,6 +320,7 @@
 			projectRoot = "";
 			targets = (
 				F54406E62CD4987A00C7AFD9 /* DynamicIsland */,
+				8A1B2C3D4E5F60718293A4B3 /* DynamicIslandTests */,
 			);
 		};
 /* End PBXProject section */
@@ -287,6 +337,13 @@
 				7E9911B02EFD7D1B002EDFD5 /* Reindeer.json in Resources */,
 				7E8840D72E9A346700C5CB8C /* Dog waiting.json in Resources */,
 				7E8840DB2E9A347800C5CB8C /* Orange Cat Peeping.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A1B2C3D4E5F60718293A4B6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -321,7 +378,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8A1B2C3D4E5F60718293A4B4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8A1B2C3D4E5F60718293A4BA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = DynamicIsland;
+			target = F54406E62CD4987A00C7AFD9 /* DynamicIsland */;
+			targetProxy = 8A1B2C3D4E5F60718293A4BB /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		F54406F42CD4987B00C7AFD9 /* Debug */ = {
@@ -584,6 +657,46 @@
 			};
 			name = Release;
 		};
+		8A1B2C3D4E5F60718293A4B7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Ebullioscopic.Atoll.DynamicIslandTests;
+				PRODUCT_MODULE_NAME = DynamicIslandTests;
+				PRODUCT_NAME = DynamicIslandTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Atoll.app/Contents/MacOS/Atoll";
+			};
+			name = Debug;
+		};
+		8A1B2C3D4E5F60718293A4B8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Ebullioscopic.Atoll.DynamicIslandTests;
+				PRODUCT_MODULE_NAME = DynamicIslandTests;
+				PRODUCT_NAME = DynamicIslandTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Atoll.app/Contents/MacOS/Atoll";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -601,6 +714,15 @@
 			buildConfigurations = (
 				F54406F72CD4987B00C7AFD9 /* Debug */,
 				F54406F82CD4987B00C7AFD9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8A1B2C3D4E5F60718293A4B9 /* Build configuration list for PBXNativeTarget "DynamicIslandTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8A1B2C3D4E5F60718293A4B7 /* Debug */,
+				8A1B2C3D4E5F60718293A4B8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

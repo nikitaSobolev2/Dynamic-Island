@@ -99,13 +99,14 @@ struct ExpandedItem {
     var type: SneakContentType = .battery
     var value: CGFloat = 0
     var browser: BrowserType = .chromium
+    var autoHideDuration: TimeInterval? = nil
 }
 
 class DynamicIslandViewCoordinator: ObservableObject {
     static let shared = DynamicIslandViewCoordinator()
     private var cancellables = Set<AnyCancellable>()
     
-    private static let tabOrder: [NotchViews] = [.home, .shelf, .timer, .stats, .colorPicker, .notes, .clipboard, .terminal, .extensionExperience]
+    private static let tabOrder: [NotchViews] = [.home, .shelf, .timer, .stats, .llmUsage, .colorPicker, .notes, .clipboard, .terminal, .extensionExperience]
     
     /// Direction of the most recent tab switch (true = forward/right, false = backward/left)
     @Published var tabSwitchForward: Bool = true
@@ -418,7 +419,8 @@ class DynamicIslandViewCoordinator: ObservableObject {
         status: Bool,
         type: SneakContentType,
         value: CGFloat = 0,
-        browser: BrowserType = .chromium
+        browser: BrowserType = .chromium,
+        autoHideDuration: TimeInterval? = nil
     ) {
         if status && isHoverPreviewActive {
             return
@@ -429,6 +431,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
                 self.expandingView.type = type
                 self.expandingView.value = value
                 self.expandingView.browser = browser
+                self.expandingView.autoHideDuration = autoHideDuration
             }
         }
     }
@@ -441,7 +444,7 @@ class DynamicIslandViewCoordinator: ObservableObject {
                 expandingViewTask?.cancel()
                 // Only auto-hide for battery, not for downloads (DownloadManager handles that)
                 if expandingView.type != .download {
-                    let duration: TimeInterval = 3
+                    let duration = expandingView.autoHideDuration ?? 3
                     expandingViewTask = Task { [weak self] in
                         try? await Task.sleep(for: .seconds(duration))
                         guard let self = self, !Task.isCancelled else { return }

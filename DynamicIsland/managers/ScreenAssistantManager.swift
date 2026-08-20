@@ -397,6 +397,8 @@ class ScreenAssistantManager: NSObject, ObservableObject {
             sendToClaudeAPI(message: message, files: files)
         case .local:
             sendToLocalAPI(message: message, files: files)
+        case .groq:
+            sendToGroqAPI(message: message, files: files)
         }
     }
     
@@ -444,6 +446,38 @@ class ScreenAssistantManager: NSObject, ObservableObject {
         }
         
         performOpenAIRequest(url: url, requestBody: buildOpenAIRequestBody(message: message, files: files, model: modelId), apiKey: apiKey)
+    }
+
+    private func sendToGroqAPI(message: String, files: [ScreenAssistantFile]) {
+        let apiKey = Defaults[.groqApiKey]
+        guard !apiKey.isEmpty else {
+            print("❌ ScreenAssistant: No Groq API key configured")
+            addAssistantMessage("Error: No Groq API key configured. Please set your API key in model settings.")
+            isLoading = false
+            return
+        }
+
+        let selectedModel = Defaults[.selectedAIModel]
+        let modelId: String
+        if let selectedId = selectedModel?.id,
+           AIModelProvider.groq.supportedModels.contains(where: { $0.id == selectedId }) {
+            modelId = selectedId
+        } else {
+            modelId = "llama-3.3-70b-versatile"
+        }
+
+        guard let url = URL(string: "https://api.groq.com/openai/v1/chat/completions") else {
+            print("❌ ScreenAssistant: Invalid Groq API URL")
+            addAssistantMessage("Error: Invalid API URL")
+            isLoading = false
+            return
+        }
+
+        performOpenAIRequest(
+            url: url,
+            requestBody: buildOpenAIRequestBody(message: message, files: files, model: modelId),
+            apiKey: apiKey
+        )
     }
     
     private func sendToClaudeAPI(message: String, files: [ScreenAssistantFile]) {
@@ -796,6 +830,8 @@ class ScreenAssistantManager: NSObject, ObservableObject {
             parseClaudeResponse(data: data)
         case .local:
             parseOllamaResponse(data: data)
+        case .groq:
+            parseOpenAIResponse(data: data)
         }
     }
     

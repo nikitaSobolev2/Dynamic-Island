@@ -256,6 +256,54 @@ enum CalendarSelectionState: Codable, Defaults.Serializable {
     case selected(Set<String>)
 }
 
+enum FantasticalViewStyle: String, CaseIterable, Codable, Defaults.Serializable {
+    case mini = "mini"
+    case calendar = "calendar"
+
+    var displayName: String {
+        switch self {
+        case .mini: return "Mini View"
+        case .calendar: return "Full Calendar"
+        }
+    }
+}
+
+enum ThirdPartyCalendarApp: String, CaseIterable, Codable, Defaults.Serializable, Identifiable {
+    case fantastical = "fantastical"
+    case notionCalendar = "notionCalendar"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .fantastical: return "Fantastical"
+        case .notionCalendar: return "Notion Calendar"
+        }
+    }
+
+    /// Bundle identifiers to try when looking up the app icon (first match wins).
+    var bundleIdentifiers: [String] {
+        switch self {
+        case .fantastical: return ["com.flexibits.fantastical2.mac", "com.flexibits.fantastical"]
+        case .notionCalendar: return ["com.cron.electron"]
+        }
+    }
+
+    var fallbackIconName: String {
+        switch self {
+        case .fantastical: return "calendar.badge.clock"
+        case .notionCalendar: return "calendar.badge.plus"
+        }
+    }
+
+    var fallbackIconColor: Color {
+        switch self {
+        case .fantastical: return .red
+        case .notionCalendar: return .blue
+        }
+    }
+}
+
 enum ClipboardDisplayMode: String, CaseIterable, Codable, Defaults.Serializable {
     case popover = "popover"     // Traditional popover attached to button
     case panel = "panel"         // Floating panel near notch
@@ -407,12 +455,48 @@ enum CapsLockIndicatorTintMode: String, CaseIterable, Identifiable, Defaults.Ser
     }
 }
 
+enum LogLevel: Int, CaseIterable, Identifiable, Defaults.Serializable {
+    case none = 0
+    case error = 1
+    case warning = 2
+    case info = 3
+    case debug = 4
+
+    var id: Int { self.rawValue }
+
+    var displayName: String {
+        switch self {
+        case .none: return "No Logging"
+        case .error: return "Error"
+        case .warning: return "Warning"
+        case .info: return "Info"
+        case .debug: return "Debug"
+        }
+    }
+}
+
 enum ProgressBarStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
     case hierarchical = "Hierarchical"
     case gradient = "Gradient"
     case segmented = "Segmented"
     
     var id: String { self.rawValue }
+}
+
+enum BatteryNotificationStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case standard
+    case compact
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .standard:
+            return String(localized: "Standard")
+        case .compact:
+            return String(localized: "Compact")
+        }
+    }
 }
 
 enum MusicAuxiliaryControl: String, CaseIterable, Identifiable, Defaults.Serializable {
@@ -530,6 +614,33 @@ enum FocusMonitoringMode: String, CaseIterable, Identifiable, Defaults.Serializa
     }
 }
 
+enum SiriResponsivenessMode: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case automatic
+    case highPerformance
+    case balanced
+    case powerSaver
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .automatic: return String(localized: "Automatic")
+        case .highPerformance: return String(localized: "High Performance")
+        case .balanced: return String(localized: "Balanced")
+        case .powerSaver: return String(localized: "Power Saver")
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .automatic: return String(localized: "Adapts based on power source and battery level.")
+        case .highPerformance: return String(localized: "Ultra-fast detection (30Hz) for near-instant hiding.")
+        case .balanced: return String(localized: "Standard detection (16Hz) for smooth responsiveness.")
+        case .powerSaver: return String(localized: "Slower detection (4Hz) to maximize battery life.")
+        }
+    }
+}
+
 enum ReminderPresentationStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
     case ringCountdown = "Ring"
     case digital = "Digital"
@@ -555,6 +666,7 @@ enum AIModelProvider: String, CaseIterable, Identifiable, Defaults.Serializable 
     case openai = "OpenAI GPT"
     case claude = "Claude"
     case local = "Local Model"
+    case groq = "Groq"
     
     var id: String { self.rawValue }
     
@@ -568,6 +680,7 @@ enum AIModelProvider: String, CaseIterable, Identifiable, Defaults.Serializable 
         case .openai: return "OpenAI's GPT models with advanced reasoning"
         case .claude: return "Anthropic's Claude with strong analytical skills"
         case .local: return "Local AI model (Ollama or similar)"
+        case .groq: return "Groq's fast inference for OpenAI-compatible models"
         }
     }
     
@@ -608,6 +721,13 @@ enum AIModelProvider: String, CaseIterable, Identifiable, Defaults.Serializable 
                 AIModel(id: "llama3.2", name: "Llama 3.2", supportsThinking: false),
                 AIModel(id: "qwen2.5", name: "Qwen 2.5", supportsThinking: false)
             ]
+        case .groq:
+            return [
+                AIModel(id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B Versatile", supportsThinking: false),
+                AIModel(id: "llama-3.1-8b-instant", name: "Llama 3.1 8B Instant", supportsThinking: false),
+                AIModel(id: "qwen-qwq-32b", name: "Qwen QWQ 32B", supportsThinking: false),
+                AIModel(id: "mixtral-8x7b-32768", name: "Mixtral 8x7B", supportsThinking: false)
+            ]
         }
     }
 }
@@ -627,35 +747,49 @@ struct NoteItem: Codable, Identifiable, Defaults.Serializable, Hashable {
     var title: String
     var content: String
     var creationDate: Date
+    var modificationDate: Date
     var colorIndex: Int // 0: Yellow, 1: Blue, 2: Red, 3: Green
     var isPinned: Bool = false
     var imageFileName: String? = nil // Store filename instead of raw data
-    
-    // Internal property for migration
+    var appleNotesId: String? = nil
+
     private enum CodingKeys: String, CodingKey {
-        case id, title, content, creationDate, colorIndex, isPinned, imageFileName, imageData
+        case id, title, content, creationDate, modificationDate, colorIndex, isPinned, imageFileName, imageData, appleNotesId
     }
-    
-    init(id: UUID = UUID(), title: String, content: String, creationDate: Date, colorIndex: Int, isPinned: Bool = false, imageFileName: String? = nil) {
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        content: String,
+        creationDate: Date,
+        modificationDate: Date? = nil,
+        colorIndex: Int,
+        isPinned: Bool = false,
+        imageFileName: String? = nil,
+        appleNotesId: String? = nil
+    ) {
         self.id = id
         self.title = title
         self.content = content
         self.creationDate = creationDate
+        self.modificationDate = modificationDate ?? creationDate
         self.colorIndex = colorIndex
         self.isPinned = isPinned
         self.imageFileName = imageFileName
+        self.appleNotesId = appleNotesId
     }
-    
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         title = try container.decode(String.self, forKey: .title)
         content = try container.decode(String.self, forKey: .content)
         creationDate = try container.decode(Date.self, forKey: .creationDate)
+        modificationDate = try container.decodeIfPresent(Date.self, forKey: .modificationDate) ?? creationDate
         colorIndex = try container.decode(Int.self, forKey: .colorIndex)
         isPinned = try container.decode(Bool.self, forKey: .isPinned)
-        
-        // Migration logic: if imageData exists but imageFileName doesn't, save it to disk
+        appleNotesId = try container.decodeIfPresent(String.self, forKey: .appleNotesId)
+
         if let data = try container.decodeIfPresent(Data.self, forKey: .imageData) {
             let fileName = "note_image_\(id.uuidString).png"
             let fileURL = NoteItem.noteImageDataDirectory.appendingPathComponent(fileName)
@@ -665,16 +799,18 @@ struct NoteItem: Codable, Identifiable, Defaults.Serializable, Hashable {
             imageFileName = try container.decodeIfPresent(String.self, forKey: .imageFileName)
         }
     }
-    
+
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encode(title, forKey: .title)
         try container.encode(content, forKey: .content)
         try container.encode(creationDate, forKey: .creationDate)
+        try container.encode(modificationDate, forKey: .modificationDate)
         try container.encode(colorIndex, forKey: .colorIndex)
         try container.encode(isPinned, forKey: .isPinned)
         try container.encode(imageFileName, forKey: .imageFileName)
+        try container.encodeIfPresent(appleNotesId, forKey: .appleNotesId)
     }
     
     static let colors: [Color] = [.yellow, .blue, .red, .green, .purple, .orange]
@@ -702,8 +838,15 @@ struct NoteItem: Codable, Identifiable, Defaults.Serializable, Hashable {
     }
 }
 
+enum ColorExtractionMode: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case legacy, vibrant
+    var id: Self { self }
+}
+
 extension Defaults.Keys {
         // MARK: General
+    static let updateChannel = Key<UpdateChannel>("updateChannel", default: .stable)
+    static let logLevel = Key<LogLevel>("logLevel", default: .none)
     static let menubarIcon = Key<Bool>("menubarIcon", default: true)
     static let showOnAllDisplays = Key<Bool>("showOnAllDisplays", default: false)
     static let automaticallySwitchDisplay = Key<Bool>("automaticallySwitchDisplay", default: true)
@@ -733,6 +876,8 @@ extension Defaults.Keys {
     static let nonNotchHeight = Key<CGFloat>("nonNotchHeight", default: 32)
     static let notchHeight = Key<CGFloat>("notchHeight", default: 32)
     static let openNotchWidth = Key<CGFloat>("openNotchWidth", default: 640)
+    static let closedNotchWidth = Key<CGFloat>("closedNotchWidth", default: 150)
+    static let customizePhysicalNotchWidth = Key<Bool>("customizePhysicalNotchWidth", default: false)
         //static let openLastTabByDefault = Key<Bool>("openLastTabByDefault", default: false)
     
         // MARK: Appearance
@@ -740,6 +885,7 @@ extension Defaults.Keys {
         //static let alwaysShowTabs = Key<Bool>("alwaysShowTabs", default: true)
     static let showMirror = Key<Bool>("showMirror", default: false)
     static let mirrorShape = Key<MirrorShapeEnum>("mirrorShape", default: MirrorShapeEnum.rectangle)
+    static let selectedCameraID = Key<String>("selectedCameraID", default: "")
     static let settingsIconInNotch = Key<Bool>("settingsIconInNotch", default: true)
     static let lightingEffect = Key<Bool>("lightingEffect", default: true)
     static let accentColor = Key<Color>("accentColor", default: Color.blue)
@@ -760,6 +906,9 @@ extension Defaults.Keys {
     )
     static let playerColorTinting = Key<Bool>("playerColorTinting", default: true)
     static let useMusicVisualizer = Key<Bool>("useMusicVisualizer", default: true)
+    static let visualizerBarCount = Key<Int>("visualizerBarCount", default: 4)
+    static let enableWaveformScrubber = Key<Bool>("enableWaveformScrubber", default: true)
+    static let colorExtractionMode = Key<ColorExtractionMode>("colorExtractionMode", default: .vibrant)
     static let customVisualizers = Key<[CustomVisualizer]>("customVisualizers", default: [])
     static let selectedVisualizer = Key<CustomVisualizer?>("selectedVisualizer", default: nil)
     static let customAppIcons = Key<[CustomAppIcon]>("customAppIcons", default: [])
@@ -776,11 +925,13 @@ extension Defaults.Keys {
     
         // MARK: Media playback
     static let coloredSpectrogram = Key<Bool>("coloredSpectrogram", default: true)
+    static let enableRealTimeWaveform = Key<Bool>("enableRealTimeWaveform", default: false)
     static let enableSneakPeek = Key<Bool>("enableSneakPeek", default: false)
     static let sneakPeekStyles = Key<SneakPeekStyle>("sneakPeekStyles", default: .standard)
     static let showSneakPeekOnTrackChange = Key<Bool>("showSneakPeekOnTrackChange", default: true)
     static let enableFullscreenMediaDetection = Key<Bool>("enableFullscreenMediaDetection", default: true)
     static let enableParallaxEffect = Key<Bool>("enableParallaxEffect", default: true)
+    static let parallaxEffectIntensity = Key<Double>("parallaxEffectIntensity", default: 6.0)
     static let waitInterval = Key<Double>("waitInterval", default: 3)
     static let showShuffleAndRepeat = Key<Bool>("showShuffleAndRepeat", default: true)
     static let showMediaOutputControl = Key<Bool>("showMediaOutputControl", default: true)
@@ -800,6 +951,7 @@ extension Defaults.Keys {
     static let enableLockScreenMediaWidget = Key<Bool>("enableLockScreenMediaWidget", default: true)
     static let enableLockScreenWeatherWidget = Key<Bool>("enableLockScreenWeatherWidget", default: true)
     static let enableLockScreenFocusWidget = Key<Bool>("enableLockScreenFocusWidget", default: true)
+    static let siriResponsivenessMode = Key<SiriResponsivenessMode>("siriResponsivenessMode", default: .automatic)
     static let enableLockScreenReminderWidget = Key<Bool>("enableLockScreenReminderWidget", default: true)
     static let enableLockScreenTimerWidget = Key<Bool>("enableLockScreenTimerWidget", default: true)
     static let lockScreenWeatherRefreshInterval = Key<TimeInterval>("lockScreenWeatherRefreshInterval", default: 30 * 60)
@@ -817,6 +969,7 @@ extension Defaults.Keys {
     static let lockScreenMusicAlbumParallaxEnabled = Key<Bool>("lockScreenMusicAlbumParallaxEnabled", default: false)
     static let lockScreenTimerVerticalOffset = Key<Double>("lockScreenTimerVerticalOffset", default: 0)
     static let lockScreenTimerWidgetWidth = Key<Double>("lockScreenTimerWidgetWidth", default: 350)
+    static let lockScreenWidgetAppearance = Key<LockScreenWidgetAppearance>("lockScreenWidgetAppearance", default: .dark)
     static let lockScreenGlassStyle = Key<LockScreenGlassStyle>("lockScreenGlassStyle", default: .liquid)
     static let lockScreenGlassCustomizationMode = Key<LockScreenGlassCustomizationMode>(
         "lockScreenGlassCustomizationMode",
@@ -837,8 +990,16 @@ extension Defaults.Keys {
     )
     static let lockScreenShowAppIcon = Key<Bool>("lockScreenShowAppIcon", default: false)
     static let lockScreenPanelShowsBorder = Key<Bool>("lockScreenPanelShowsBorder", default: false)
+    static let lockScreenMusicUsesEnhancedLiquidBorder = Key<Bool>(
+        "lockScreenMusicUsesEnhancedLiquidBorder",
+        default: true
+    )
     static let lockScreenPanelUsesBlur = Key<Bool>("lockScreenPanelUsesBlur", default: true)
     static let lockScreenMusicMergedAirPlayOutput = Key<Bool>("lockScreenMusicMergedAirPlayOutput", default: true)
+    static let lockScreenMusicFullscreenArtworkEnabled = Key<Bool>("lockScreenMusicFullscreenArtworkEnabled", default: true)
+    static let lockScreenKeepAlbumArtVisibleDuringFullscreenArtwork = Key<Bool>("lockScreenKeepAlbumArtVisibleDuringFullscreenArtwork", default: false)
+    static let lockScreenMusicFullscreenVideoArtwork = Key<Bool>("lockScreenMusicFullscreenVideoArtwork", default: true)
+    static let lockScreenUseArtworkLayoutOverFullscreenCanvas = Key<Bool>("lockScreenShowCenteredAlbumArtOverFullscreenCanvas", default: true)
     static let lockScreenTimerWidgetUsesBlur = Key<Bool>("lockScreenTimerWidgetUsesBlur", default: false)
     static let lockScreenReminderChipStyle = Key<LockScreenReminderChipStyle>("lockScreenReminderChipStyle", default: .eventColor)
     static let lockScreenReminderWidgetHorizontalAlignment = Key<String>("lockScreenReminderWidgetHorizontalAlignment", default: "center")
@@ -854,13 +1015,30 @@ extension Defaults.Keys {
     static let lockScreenShowCalendarTimeRemaining = Key<Bool>("lockScreenShowCalendarTimeRemaining", default: true)
     static let lockScreenShowCalendarStartTimeAfterBegins = Key<Bool>("lockScreenShowCalendarStartTimeAfterBegins", default: true)
     static let lockScreenWeatherWidgetRowOrder = Key<String>("lockScreenWeatherWidgetRowOrder", default: "weather_calendar_focus")
+
+    // MARK: Third-party Calendar Integration
+    static let enableThirdPartyCalendarApp = Key<Bool>("enableThirdPartyCalendarApp", default: false)
+    static let selectedCalendarApp = Key<ThirdPartyCalendarApp>("selectedCalendarApp", default: .fantastical)
+    static let fantasticalDefaultView = Key<FantasticalViewStyle>("fantasticalDefaultView", default: .mini)
     
         // MARK: Battery
     static let showPowerStatusNotifications = Key<Bool>("showPowerStatusNotifications", default: true)
     static let showBatteryIndicator = Key<Bool>("showBatteryIndicator", default: BatteryActivityManager.shared.hasBattery())
     static let showBatteryPercentage = Key<Bool>("showBatteryPercentage", default: true)
+    static let showBatteryPercentInside = Key<Bool>("showBatteryPercentInside", default: true)
+    static let showMinimalisticBatteryIndicator = Key<Bool>("showMinimalisticBatteryIndicator", default: true)
     static let showPowerStatusIcons = Key<Bool>("showPowerStatusIcons", default: true)
     static let playLowBatteryAlertSound = Key<Bool>("playLowBatteryAlertSound", default: true)
+    static let showChargingBatteryHUD = Key<Bool>("showChargingBatteryHUD", default: true)
+    static let showLowBatteryHUD = Key<Bool>("showLowBatteryHUD", default: true)
+    static let showFullBatteryHUD = Key<Bool>("showFullBatteryHUD", default: true)
+    static let chargingBatteryHUDDuration = Key<Int>("chargingBatteryHUDDuration", default: 3)
+    static let lowBatteryHUDDuration = Key<Int>("lowBatteryHUDDuration", default: 3)
+    static let fullBatteryHUDDuration = Key<Int>("fullBatteryHUDDuration", default: 3)
+    static let lowBatteryHUDThreshold = Key<Int>("lowBatteryHUDThreshold", default: 20)
+    static let fullBatteryHUDThreshold = Key<Int>("fullBatteryHUDThreshold", default: 100)
+    static let lowBatteryHUDStyle = Key<BatteryNotificationStyle>("lowBatteryHUDStyle", default: .standard)
+    static let fullBatteryHUDStyle = Key<BatteryNotificationStyle>("fullBatteryHUDStyle", default: .standard)
     
     static let lockScreenBatteryShowsBatteryGauge = Key<Bool>(
         "lockScreenWeatherShowsBatteryGauge",
@@ -894,6 +1072,7 @@ extension Defaults.Keys {
         static let localSendDevicePickerGlassMode = Key<LockScreenGlassCustomizationMode>("localSendDevicePickerGlassMode", default: .standard)
         static let localSendDevicePickerLiquidGlassVariant = Key<LiquidGlassVariant>("localSendDevicePickerLiquidGlassVariant", default: .v11)
         static let copyOnDrag = Key<Bool>("copyOnDrag", default: false)
+        static let allowMoveOnDrag = Key<Bool>("allowMoveOnDrag", default: false)
         static let autoRemoveShelfItems = Key<Bool>("autoRemoveShelfItems", default: false)
         static let expandedDragDetection = Key<Bool>("expandedDragDetection", default: true)
     
@@ -912,6 +1091,14 @@ extension Defaults.Keys {
     
     // MARK: Media Controller
     static let mediaController = Key<MediaControllerType>("mediaController", default: defaultMediaController)
+    static let spotifySPDCCookie = Key<String>("spotifySPDCCookie", default: "")
+    static let spotifyAuthAccessToken = Key<String>("spotifyAuthAccessToken", default: "")
+    static let spotifyAuthAccessTokenExpiration = Key<Double>("spotifyAuthAccessTokenExpiration", default: 0)
+    static let spotifyAuthLastValidatedAt = Key<Double>("spotifyAuthLastValidatedAt", default: 0)
+    static let spotifyLibraryClientID = Key<String>("spotifyLibraryClientID", default: "")
+    static let spotifyLibraryAccessToken = Key<String>("spotifyLibraryAccessToken", default: "")
+    static let spotifyLibraryRefreshToken = Key<String>("spotifyLibraryRefreshToken", default: "")
+    static let spotifyLibraryTokenExpiration = Key<Double>("spotifyLibraryTokenExpiration", default: 0)
     
     // MARK: Bluetooth Audio Devices
     static let showBluetoothDeviceConnections = Key<Bool>("showBluetoothDeviceConnections", default: true)
@@ -922,9 +1109,15 @@ extension Defaults.Keys {
     static let showBluetoothBatteryPercentageText = Key<Bool>("showBluetoothBatteryPercentageText", default: false)
     static let showBluetoothDeviceNameMarquee = Key<Bool>("showBluetoothDeviceNameMarquee", default: false)
     static let useBluetoothHUD3DIcon = Key<Bool>("useBluetoothHUD3DIcon", default: true)
+    static let showAirPodsListeningModeChanges = Key<Bool>("showAirPodsListeningModeChanges", default: true)
     
     // MARK: Stats Feature
     static let enableStatsFeature = Key<Bool>("enableStatsFeature", default: false)
+    static let enableLLMUsageFeature = Key<Bool>("enableLLMUsageFeature", default: false)
+    static let enableClaudeProvider = Key<Bool>("enableClaudeProvider", default: true)
+    static let enableCodexProvider = Key<Bool>("enableCodexProvider", default: true)
+    static let enableCursorProvider = Key<Bool>("enableCursorProvider", default: true)
+    static let enableAntigravityProvider = Key<Bool>("enableAntigravityProvider", default: true)
     static let autoStartStatsMonitoring = Key<Bool>("autoStartStatsMonitoring", default: true)
     static let statsStopWhenNotchCloses = Key<Bool>("statsStopWhenNotchCloses", default: true)
     static let statsUpdateInterval = Key<Double>("statsUpdateInterval", default: 1.0)
@@ -964,6 +1157,7 @@ extension Defaults.Keys {
     static let timerShowsProgress = Key<Bool>("timerShowsProgress", default: true)
     static let timerProgressStyle = Key<TimerProgressStyle>("timerProgressStyle", default: .bar)
     static let mirrorSystemTimer = Key<Bool>("mirrorSystemTimer", default: true)
+    static let timerInputStyle = Key<TimerInputStyle>("timerInputStyle", default: .manual)
     
     // MARK: Reminder Live Activity
     static let enableReminderLiveActivity = Key<Bool>("enableReminderLiveActivity", default: true)
@@ -991,6 +1185,7 @@ extension Defaults.Keys {
     static let geminiApiKey = Key<String>("geminiApiKey", default: "")
     static let openaiApiKey = Key<String>("openaiApiKey", default: "")
     static let claudeApiKey = Key<String>("claudeApiKey", default: "")
+    static let groqApiKey = Key<String>("groqApiKey", default: "")
     static let selectedAIProvider = Key<AIModelProvider>("selectedAIProvider", default: .gemini)
     static let selectedAIModel = Key<AIModel?>("selectedAIModel", default: nil)
     static let enableThinkingMode = Key<Bool>("enableThinkingMode", default: false)
@@ -1022,6 +1217,10 @@ extension Defaults.Keys {
     static let enableKeyboardBacklightHUD = Key<Bool>("enableKeyboardBacklightHUD", default: true)
     static let systemHUDSensitivity = Key<Int>("systemHUDSensitivity", default: 5)
     static let playVolumeChangeFeedback = Key<Bool>("playVolumeChangeFeedback", default: false)
+    static let volumeStepPercent = Key<Int>("volumeStepPercent", default: 6)
+    static let volumeFineStepPercent = Key<Int>("volumeFineStepPercent", default: 2)
+    static let brightnessStepPercent = Key<Int>("brightnessStepPercent", default: 6)
+    static let brightnessFineStepPercent = Key<Int>("brightnessFineStepPercent", default: 2)
     
     // MARK: Custom OSD Window Feature
     static let enableCustomOSD = Key<Bool>("enableCustomOSD", default: false)
@@ -1116,6 +1315,7 @@ extension Defaults.Keys {
     
     // MARK: Lyrics Feature
     static let enableLyrics = Key<Bool>("enableLyrics", default: false)
+    static let showLiveCanvasInDynamicIsland = Key<Bool>("showLiveCanvasInDynamicIsland", default: false)
     
     // MARK: Notes Feature
     static let enableNotes = Key<Bool>("enableNotes", default: false)
@@ -1125,6 +1325,9 @@ extension Defaults.Keys {
     static let enableCreateFromClipboard = Key<Bool>("enableCreateFromClipboard", default: true)
     static let enableNoteCharCount = Key<Bool>("enableNoteCharCount", default: true)
     static let savedNotes = Key<[NoteItem]>("savedNotes", default: [])
+    static let enableAppleNotesSync = Key<Bool>("enableAppleNotesSync", default: false)
+    static let appleNotesLastSyncDate = Key<Date?>("appleNotesLastSyncDate", default: nil)
+    static let showSongMetadataInClosedNotch = Key<Bool>("showSongMetadataInClosedNotch", default: false)
     
     // Helper to determine the default media controller based on macOS version
     static var defaultMediaController: MediaControllerType {

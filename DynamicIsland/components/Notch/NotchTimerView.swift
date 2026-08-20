@@ -34,6 +34,7 @@ struct NotchTimerView: View {
     @Default(.timerShowsProgress) private var showsProgress
     @Default(.timerProgressStyle) private var progressStyle
     @Default(.showTimerPresetsInNotchTab) private var showTimerPresetsInNotchTab
+    @Default(.timerInputStyle) private var timerInputStyle
 
     @AppStorage("customTimerDuration") private var customTimerDuration: Double = 600
     @State private var customHours: Int = 0
@@ -294,7 +295,15 @@ struct NotchTimerView: View {
 
     private var customTimerComposer: some View {
         Group {
-            if showTimerPresetsInNotchTab {
+            if timerInputStyle == .ruler {
+                RulerTimerPicker(
+                    hours: $customHours,
+                    minutes: $customMinutes,
+                    seconds: $customSeconds,
+                    tintColor: timerAccentColor,
+                    startAction: startCustomTimer
+                )
+            } else if showTimerPresetsInNotchTab {
                 VStack(alignment: .leading, spacing: 12) {
                     DurationInputRow(
                         hours: $customHours,
@@ -511,6 +520,15 @@ struct NotchTimerView: View {
 
     private var customDurationInSeconds: TimeInterval {
         TimeInterval(customHours * 3600 + customMinutes * 60 + customSeconds)
+    }
+
+    private func startCustomTimer() {
+        withAnimation(.smooth) {
+            timerManager.startTimer(duration: customDurationInSeconds, name: String(localized: "Custom Timer"))
+            if !enableMinimalisticUI {
+                coordinator.currentView = .timer
+            }
+        }
     }
 
     private func resetCustomTimerInputs() {

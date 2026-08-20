@@ -373,16 +373,12 @@ private struct DraggableClickHandler<Content: View>: NSViewRepresentable {
         // MARK: - NSDraggingSource
         
         func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
-            // When copyOnDrag is enabled, only allow copy operations
-            if Defaults[.copyOnDrag] {
-                return [.copy]
-            }
-            
             switch context {
             case .outsideApplication:
-                return [.copy, .move]
+                let allowsMove = Defaults[.allowMoveOnDrag] && !Defaults[.copyOnDrag]
+                return allowsMove ? [.copy, .move] : [.copy]
             case .withinApplication:
-                return [.copy, .move, .generic]
+                return Defaults[.copyOnDrag] ? [.copy] : [.copy, .move, .generic]
             @unknown default:
                 return [.copy]
             }

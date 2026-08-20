@@ -31,10 +31,15 @@ struct DynamicNotchApp: App {
     @Environment(\.openWindow) var openWindow
 
     let updaterController: SPUStandardUpdaterController
+    /// Retained delegate instance that dynamically selects the Sparkle feed URL
+    /// based on the user's update channel preference.
+    private let updaterDelegate = AtollUpdaterDelegate()
 
     init() {
         updaterController = SPUStandardUpdaterController(
-            startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+            startingUpdater: true,
+            updaterDelegate: updaterDelegate,
+            userDriverDelegate: nil)
         updaterController.updater.automaticallyChecksForUpdates = true
         updaterController.updater.automaticallyDownloadsUpdates = true
 
@@ -123,6 +128,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let downloadManager = DownloadManager.shared  // NEW: Chromium downloads detection
     let screenshotCaptureManager = ScreenshotCaptureManager.shared
     let lockScreenPanelManager = LockScreenPanelManager.shared  // NEW: Lock screen music panel
+    let siriVisibilityMonitor = SiriVisibilityMonitor.shared
     let mediaControlsStateCoordinator = MediaControlsStateCoordinator.shared
     let systemTimerBridge = SystemTimerBridge.shared
     let extensionXPCServiceHost = ExtensionXPCServiceHost.shared
@@ -318,20 +324,62 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func calculateRequiredNotchSize() -> CGSize {
         // Check if inline sneak peek is showing and notch is closed
-        let isInlineSneakPeekActive = vm.notchState == .closed && 
-                                      coordinator.expandingView.show && 
-                                      (coordinator.expandingView.type == .music || coordinator.expandingView.type == .timer) && 
-                                      Defaults[.enableSneakPeek] && 
-                                      Defaults[.sneakPeekStyles] == .inline
-        
+        let airPodsListeningModeSneakActive = vm.notchState == .closed &&
+                                      coordinator.sneakPeek.show &&
+                                      coordinator.sneakPeek.type == .bluetoothAudio &&
+                                      coordinator.sneakPeek.value < 0 &&
+                                      AirPodsListeningMode.fromHUDSymbol(coordinator.sneakPeek.icon) != nil
+        let isInlineSneakPeekActive = vm.notchState == .closed &&
+                                      Defaults[.enableSneakPeek] &&
+                                      (
+                                          coordinator.expandingView.show &&
+                                          (coordinator.expandingView.type == .music || coordinator.expandingView.type == .timer) &&
+                                          Defaults[.sneakPeekStyles] == .inline ||
+                                          airPodsListeningModeSneakActive
+                                      )
+
         // If inline sneak peek is active, use a wider width to accommodate the expanded content
         if isInlineSneakPeekActive {
-            // Calculate required width for inline sneak peek:
-            // Album art (~32) + Middle section (380) + Visualizer (~32) + horizontal padding (28) + clip shape margin (12)
             let inlineSneakPeekWidth: CGFloat = 460
             return CGSize(width: inlineSneakPeekWidth, height: vm.effectiveClosedNotchHeight)
         }
-        
+
+        if vm.notchState == .closed &&
+           coordinator.expandingView.show &&
+           coordinator.expandingView.type == .battery &&
+           Defaults[.showPowerStatusNotifications] {
+
+            let batteryModel = BatteryStatusViewModel.shared
+            if let kind = batteryModel.activeTemporaryHUDKind {
+                let closedNotchHeight = vm.effectiveClosedNotchHeight
+                let closedNotchWidth = vm.closedNotchSize.width
+
+                let style: BatteryNotificationStyle = {
+                    switch kind {
+                    case .charging: return .compact
+                    case .lowBattery: return Defaults[.lowBatteryHUDStyle]
+                    case .fullBattery: return Defaults[.fullBatteryHUDStyle]
+                    }
+                }()
+
+                var width = closedNotchWidth
+                var height = closedNotchHeight
+
+                switch (kind, style) {
+                case (.charging, _), (.lowBattery, .compact), (.fullBattery, .compact):
+                    width += 180
+                case (.lowBattery, .standard):
+                    width += 100
+                    height += 75
+                case (.fullBattery, .standard):
+                    width += 80
+                    height += 70
+                }
+
+                return addShadowPadding(to: CGSize(width: width, height: height), isMinimalistic: vm.usesMinimalisticLayout)
+            }
+        }
+
         // Use minimalistic or normal size based on settings / hover preview
         var baseSize = vm.usesMinimalisticLayout ? minimalisticOpenNotchSize : openNotchSize
         
@@ -789,6 +837,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func installTopMenuItemsIfNeeded() {
         guard let mainMenu = NSApp.mainMenu else { return }
         if mainMenu.items.contains(where: { $0.identifier?.rawValue == "Atoll.Focus.Menu" }) {
+            installToolsMenuIfNeeded(in: mainMenu)
             updateFocusMenuState()
             return
         }
@@ -876,7 +925,51 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         permissionsMenuItem.submenu = permissionsSubmenu
         mainMenu.insertItem(permissionsMenuItem, at: insertionIndex + 2)
 
+        installToolsMenuIfNeeded(in: mainMenu, at: insertionIndex + 3)
+
         updateFocusMenuState()
+    }
+
+    private func installToolsMenuIfNeeded(in mainMenu: NSMenu, at insertionIndex: Int? = nil) {
+        guard !mainMenu.items.contains(where: { $0.identifier?.rawValue == "Atoll.Tools.Menu" }) else {
+            return
+        }
+
+        let toolsMenuItem = NSMenuItem(title: "Tools", action: nil, keyEquivalent: "")
+        toolsMenuItem.identifier = NSUserInterfaceItemIdentifier("Atoll.Tools.Menu")
+        let toolsSubmenu = NSMenu(title: "Tools")
+
+        let loggingLevelItem = NSMenuItem(title: "Logging Level", action: nil, keyEquivalent: "")
+        let loggingLevelSubmenu = NSMenu(title: "Logging Level")
+
+        let levels: [(String, LogLevel)] = [
+            ("No Logging", .none),
+            ("Error", .error),
+            ("Warning", .warning),
+            ("Info", .info),
+            ("Debug", .debug)
+        ]
+
+        for (title, level) in levels {
+            let item = NSMenuItem(title: title, action: #selector(setLogLevel(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = level.rawValue
+            item.state = (Defaults[.logLevel] == level) ? NSControl.StateValue.on : NSControl.StateValue.off
+            loggingLevelSubmenu.addItem(item)
+        }
+        loggingLevelItem.submenu = loggingLevelSubmenu
+        toolsSubmenu.addItem(loggingLevelItem)
+
+        toolsSubmenu.addItem(NSMenuItem.separator())
+
+        let exportLogsItem = NSMenuItem(title: "Export Logs", action: #selector(exportLogs), keyEquivalent: "")
+        exportLogsItem.target = self
+        toolsSubmenu.addItem(exportLogsItem)
+
+        toolsMenuItem.submenu = toolsSubmenu
+        let index = insertionIndex ?? (preferredMenuInsertionIndex(in: mainMenu) + 3)
+        let clampedIndex = min(max(index, 0), mainMenu.numberOfItems)
+        mainMenu.insertItem(toolsMenuItem, at: clampedIndex)
     }
 
     private func preferredMenuInsertionIndex(in mainMenu: NSMenu) -> Int {
@@ -893,6 +986,98 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let mode = Defaults[.focusMonitoringMode]
         focusWithoutDevToolsMenuItem?.state = mode == .withoutDevTools ? .on : .off
         focusUseDevToolsMenuItem?.state = mode == .useDevTools ? .on : .off
+    }
+
+    @objc private func setLogLevel(_ sender: NSMenuItem) {
+        guard let level = LogLevel(rawValue: sender.tag) else { return }
+        Defaults[.logLevel] = level
+
+        guard let mainMenu = NSApp.mainMenu,
+              let toolsItem = mainMenu.item(withTitle: "Tools"),
+              let toolsMenu = toolsItem.submenu,
+              let loggingItem = toolsMenu.items.first(where: { $0.title == "Logging Level" }),
+              let loggingSubmenu = loggingItem.submenu else { return }
+
+        for item in loggingSubmenu.items {
+            item.state = (item.tag == level.rawValue) ? NSControl.StateValue.on : NSControl.StateValue.off
+        }
+    }
+
+    @objc private func exportLogs() {
+        let savePanel = NSSavePanel()
+        savePanel.nameFieldStringValue = "Atoll_Logs.zip"
+        savePanel.title = "Export Logs & Crash Reports"
+
+        savePanel.begin { response in
+            guard response == .OK, let url = savePanel.url else { return }
+
+            Task.detached(priority: .utility) {
+                do {
+                    let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+                    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+
+                    let logsFile = tempDir.appendingPathComponent("app_logs.txt")
+                    let logProcess = Process()
+                    logProcess.executableURL = URL(fileURLWithPath: "/usr/bin/log")
+                    logProcess.arguments = [
+                        "show",
+                        "--predicate",
+                        "subsystem == 'com.ebullioscopic.Atoll' OR subsystem == 'com.Ebullioscopic.Atoll' OR subsystem == 'com.Ebullioscopic.Atoll.dev'",
+                        "--info",
+                        "--debug",
+                        "--last",
+                        "2d"
+                    ]
+
+                    let pipe = Pipe()
+                    logProcess.standardOutput = pipe
+                    try logProcess.run()
+                    logProcess.waitUntilExit()
+
+                    let logData = pipe.fileHandleForReading.readDataToEndOfFile()
+                    try logData.write(to: logsFile)
+
+                    let diagDir = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Logs/DiagnosticReports")
+                    let allFiles = (try? FileManager.default.contentsOfDirectory(at: diagDir, includingPropertiesForKeys: nil)) ?? []
+                    for file in allFiles where file.lastPathComponent.contains("Atoll") {
+                        try? FileManager.default.copyItem(at: file, to: tempDir.appendingPathComponent(file.lastPathComponent))
+                    }
+
+                    let sysDiagDir = URL(fileURLWithPath: "/Library/Logs/DiagnosticReports")
+                    let sysFiles = (try? FileManager.default.contentsOfDirectory(at: sysDiagDir, includingPropertiesForKeys: nil)) ?? []
+                    for file in sysFiles where file.lastPathComponent.contains("Atoll") {
+                        try? FileManager.default.copyItem(at: file, to: tempDir.appendingPathComponent(file.lastPathComponent))
+                    }
+
+                    let zipProcess = Process()
+                    zipProcess.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+                    zipProcess.currentDirectoryURL = tempDir
+                    let items = (try? FileManager.default.contentsOfDirectory(atPath: tempDir.path)) ?? []
+                    zipProcess.arguments = ["-r", url.path] + items
+
+                    try zipProcess.run()
+                    zipProcess.waitUntilExit()
+
+                    try? FileManager.default.removeItem(at: tempDir)
+
+                    DispatchQueue.main.async {
+                        let alert = NSAlert()
+                        alert.messageText = "Logs Exported"
+                        alert.informativeText = "Logs and crash reports have been successfully exported to \(url.lastPathComponent)."
+                        alert.alertStyle = .informational
+                        alert.runModal()
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        let alert = NSAlert()
+                        alert.messageText = "Export Failed"
+                        alert.informativeText = "Failed to export logs: \(error.localizedDescription)"
+                        alert.alertStyle = .critical
+                        alert.runModal()
+                    }
+                }
+            }
+        }
     }
 
     @objc private func selectFocusWithoutDevTools() {

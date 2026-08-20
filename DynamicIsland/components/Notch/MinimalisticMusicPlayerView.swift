@@ -1111,7 +1111,12 @@ private struct MinimalisticReminderDetailsView: View {
 struct MinimalisticAlbumArtView: View {
     @ObservedObject var musicManager = MusicManager.shared
     @ObservedObject var vm: DynamicIslandViewModel
+    @Default(.showLiveCanvasInDynamicIsland) private var showLiveCanvasInDynamicIsland
     let albumArtNamespace: Namespace.ID
+
+    private var usesLiveCanvasArtwork: Bool {
+        showLiveCanvasInDynamicIsland && musicManager.videoArtworkURL != nil
+    }
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -1126,16 +1131,21 @@ struct MinimalisticAlbumArtView: View {
         Color.clear
             .aspectRatio(1, contentMode: .fit)
             .background(
-                Image(nsImage: musicManager.albumArt)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
+                DynamicIslandArtworkSourceView(
+                    cornerRadius: 12,
+                    contentMode: .fit
+                )
             )
             .clipped()
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .scaleEffect(x: 1.3, y: 1.4)
             .rotationEffect(.degrees(92))
             .blur(radius: 35)
-            .opacity(min(0.6, 1 - max(musicManager.albumArt.getBrightness(), 0.3)))
+            .opacity(
+                usesLiveCanvasArtwork
+                    ? (musicManager.isPlaying ? 0.35 : 0.12)
+                    : min(0.6, 1 - max(musicManager.albumArt.getBrightness(), 0.3))
+            )
     }
     
     private var albumArtButton: some View {
@@ -1145,9 +1155,10 @@ struct MinimalisticAlbumArtView: View {
             Color.clear
                 .aspectRatio(1, contentMode: .fit)
                 .background(
-                    Image(nsImage: musicManager.albumArt)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
+                    DynamicIslandArtworkSourceView(
+                        cornerRadius: 12,
+                        contentMode: .fit
+                    )
                 )
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 12))

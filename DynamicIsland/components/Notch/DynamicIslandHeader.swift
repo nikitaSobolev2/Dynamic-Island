@@ -35,6 +35,9 @@ struct DynamicIslandHeader: View {
     @Default(.timerDisplayMode) var timerDisplayMode
     @Default(.showClipboardIcon) var showClipboardIcon
     @Default(.clipboardDisplayMode) var clipboardDisplayMode
+    @Default(.showBatteryIndicator) var showBatteryIndicator
+    @Default(.showBatteryPercentInside) var showBatteryPercentInside
+    @Default(.showMinimalisticBatteryIndicator) var showMinimalisticBatteryIndicator
     
     var body: some View {
         HStack(spacing: 0) {
@@ -226,10 +229,25 @@ struct DynamicIslandHeader: View {
                             .frame(width: 30, height: 30)
                             .transition(.opacity)
                     }
-                    
+                }
 
-
-                    if Defaults[.showBatteryIndicator] {
+                if vm.notchState == .open && showBatteryIndicator {
+                    if Defaults[.enableMinimalisticUI] {
+                        if !shouldUseDynamicIslandMode(for: vm.screen) && showMinimalisticBatteryIndicator {
+                            MinimalisticBatteryView(
+                                levelBattery: batteryModel.levelBattery,
+                                isPluggedIn: batteryModel.isPluggedIn,
+                                isCharging: batteryModel.isCharging,
+                                isInLowPowerMode: batteryModel.isInLowPowerMode,
+                                bodyWidth: 28,
+                                bodyHeight: 14,
+                                isForNotification: false,
+                                showPercentInside: showBatteryPercentInside
+                            )
+                            .padding(.trailing, 4)
+                            .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                        }
+                    } else {
                         DynamicIslandBatteryView(
                             batteryWidth: 30,
                             isCharging: batteryModel.isCharging,

@@ -125,6 +125,7 @@ struct ModelSelectionView: View {
     @State private var geminiApiKey: String = Defaults[.geminiApiKey]
     @State private var openaiApiKey: String = Defaults[.openaiApiKey]
     @State private var claudeApiKey: String = Defaults[.claudeApiKey]
+    @State private var groqApiKey: String = Defaults[.groqApiKey]
     @State private var localEndpoint: String = Defaults[.localModelEndpoint]
     
     @State private var showingApiKeyAlert = false
@@ -245,6 +246,7 @@ struct ModelSelectionView: View {
                             geminiApiKey: $geminiApiKey,
                             openaiApiKey: $openaiApiKey,
                             claudeApiKey: $claudeApiKey,
+                            groqApiKey: $groqApiKey,
                             localEndpoint: $localEndpoint
                         )
                     }
@@ -291,6 +293,8 @@ struct ModelSelectionView: View {
             return !claudeApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .local:
             return !localEndpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .groq:
+            return !groqApiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
     }
     
@@ -303,6 +307,7 @@ struct ModelSelectionView: View {
         geminiApiKey = Defaults[.geminiApiKey]
         openaiApiKey = Defaults[.openaiApiKey]
         claudeApiKey = Defaults[.claudeApiKey]
+        groqApiKey = Defaults[.groqApiKey]
         localEndpoint = Defaults[.localModelEndpoint]
     }
     
@@ -314,6 +319,7 @@ struct ModelSelectionView: View {
         Defaults[.geminiApiKey] = geminiApiKey
         Defaults[.openaiApiKey] = openaiApiKey
         Defaults[.claudeApiKey] = claudeApiKey
+        Defaults[.groqApiKey] = groqApiKey
         Defaults[.localModelEndpoint] = localEndpoint
         
         closePanel()
@@ -382,6 +388,7 @@ struct ProviderCard: View {
         case .openai: return "brain.head.profile"
         case .claude: return "doc.text"
         case .local: return "server.rack"
+        case .groq: return "bolt.fill"
         }
     }
 }
@@ -440,6 +447,7 @@ struct ApiConfigurationSection: View {
     @Binding var geminiApiKey: String
     @Binding var openaiApiKey: String
     @Binding var claudeApiKey: String
+    @Binding var groqApiKey: String
     @Binding var localEndpoint: String
     
     var body: some View {
@@ -476,6 +484,13 @@ struct ApiConfigurationSection: View {
                     value: $localEndpoint,
                     helpText: "Ollama or compatible API endpoint",
                     isSecure: false
+                )
+            case .groq:
+                ApiKeyField(
+                    title: "Groq API Key",
+                    placeholder: "Enter your Groq API key",
+                    value: $groqApiKey,
+                    helpText: "Get your API key from Groq Console"
                 )
             }
         }

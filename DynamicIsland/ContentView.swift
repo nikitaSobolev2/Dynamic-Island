@@ -82,6 +82,14 @@ struct ContentView: View {
     @Default(.showStandardMediaControls) var showStandardMediaControls
     @Default(.externalDisplayStyle) var externalDisplayStyle
     @Default(.hideNonNotchUntilHover) var hideNonNotchUntilHover
+
+    @Default(.showPowerStatusNotifications) var showPowerStatusNotifications
+    @Default(.showChargingBatteryHUD) var showChargingBatteryHUD
+    @Default(.showLowBatteryHUD) var showLowBatteryHUD
+    @Default(.showFullBatteryHUD) var showFullBatteryHUD
+    @Default(.showOnAllDisplays) var showOnAllDisplays
+    @Default(.lowBatteryHUDStyle) var lowBatteryHUDStyle
+    @Default(.fullBatteryHUDStyle) var fullBatteryHUDStyle
     
     // Dynamic sizing based on view type and graph count with smooth transitions
     var dynamicNotchSize: CGSize {
@@ -89,16 +97,62 @@ struct ContentView: View {
         
         // When inline sneak peek is active in closed notch, use the wider inline width
         // so the outer maxWidth frame doesn't clip the expanded content
+        let airPodsListeningModeSneakActive = vm.notchState == .closed
+            && coordinator.sneakPeek.show
+            && coordinator.sneakPeek.type == .bluetoothAudio
+            && coordinator.sneakPeek.value < 0
+            && AirPodsListeningMode.fromHUDSymbol(coordinator.sneakPeek.icon) != nil
         let inlineSneakPeekActive = vm.notchState == .closed
-            && coordinator.expandingView.show
-            && (coordinator.expandingView.type == .music || coordinator.expandingView.type == .timer)
+            && (
+                coordinator.expandingView.show
+                    && (coordinator.expandingView.type == .music || coordinator.expandingView.type == .timer)
+                    && Defaults[.sneakPeekStyles] == .inline
+                || airPodsListeningModeSneakActive
+            )
             && Defaults[.enableSneakPeek]
-            && Defaults[.sneakPeekStyles] == .inline
         if inlineSneakPeekActive {
-            let inlineWidth: CGFloat = 460
+            let inlineWidth: CGFloat = airPodsListeningModeSneakActive
+                ? InlineHUD.airPodsListeningModeWidth(
+                    closedNotchWidth: vm.closedNotchSize.width,
+                    gestureProgress: gestureProgress,
+                    minimalistic: vm.usesMinimalisticLayout
+                ) + 28
+                : 460
             return CGSize(width: max(baseSize.width, inlineWidth), height: baseSize.height)
         }
-        
+
+        if vm.notchState == .closed &&
+           coordinator.expandingView.show &&
+           coordinator.expandingView.type == .battery &&
+           isBatteryHUDVisibleOnCurrentScreen {
+
+            if let kind = batteryModel.activeTemporaryHUDKind {
+                let style: BatteryNotificationStyle = {
+                    switch kind {
+                    case .charging: return .compact
+                    case .lowBattery: return Defaults[.lowBatteryHUDStyle]
+                    case .fullBattery: return Defaults[.fullBatteryHUDStyle]
+                    }
+                }()
+
+                var width = vm.closedNotchSize.width
+                var height = vm.effectiveClosedNotchHeight
+
+                switch (kind, style) {
+                case (.charging, _), (.lowBattery, .compact), (.fullBattery, .compact):
+                    width += 180
+                case (.lowBattery, .standard):
+                    width += 100
+                    height += 75
+                case (.fullBattery, .standard):
+                    width += 80
+                    height += 70
+                }
+
+                return CGSize(width: width, height: height)
+            }
+        }
+
         if coordinator.currentView == .timer {
             return CGSize(width: baseSize.width, height: 250) // Extra height for timer presets
         }
@@ -281,6 +335,70 @@ struct ContentView: View {
         return currentScreenName == targetScreenName
     }
 
+    private var isBatteryHUDVisibleOnCurrentScreen: Bool {
+        guard coordinator.expandingView.show, coordinator.expandingView.type == .battery else { return false }
+        guard showPowerStatusNotifications else { return false }
+        guard batteryModel.activeTemporaryHUDKind != nil else { return false }
+        if showOnAllDisplays { return true }
+        guard let targetScreenName = batteryModel.activeTemporaryHUDTargetScreenName else { return true }
+        return currentScreenName == targetScreenName
+    }
+
+    private var isCurrentScreenExpansionVisible: Bool {
+        guard coordinator.expandingView.show else { return false }
+        if coordinator.expandingView.type == .battery {
+            return isBatteryHUDVisibleOnCurrentScreen
+        }
+        return true
+    }
+
+    private var currentScreenExpansionType: SneakContentType? {
+        isCurrentScreenExpansionVisible ? coordinator.expandingView.type : nil
+    }
+
+    private var displayedBatteryHUDLevel: Int {
+        let resolvedLevel = batteryModel.activeTemporaryHUDLevelOverride
+            ?? Int(batteryModel.levelBattery.rounded())
+        return min(max(resolvedLevel, 0), 100)
+    }
+
+    private var displayedBatteryHUDUsesLowPowerMode: Bool {
+        batteryModel.activeTemporaryHUDLowPowerModeOverride ?? batteryModel.isInLowPowerMode
+    }
+
+    private var activeClosedBatterySurfaceShape: AnyShape? {
+        guard vm.notchState == .closed else { return nil }
+        guard isBatteryHUDVisibleOnCurrentScreen else { return nil }
+        guard let kind = batteryModel.activeTemporaryHUDKind else { return nil }
+
+        if isDynamicIslandMode {
+            let radius = dynamicIslandPillCornerRadiusInsets.opened
+            return AnyShape(DynamicIslandPillShape(cornerRadius: radius))
+        } else {
+            let topRadius = activeCornerRadiusInsets.closed.top
+            let bottomRadius: CGFloat = {
+                switch resolvedBatteryNotificationStyle(for: kind) {
+                case .compact:
+                    return activeCornerRadiusInsets.closed.bottom
+                case .standard:
+                    return kind == .fullBattery ? 36 : 40
+                }
+            }()
+            return AnyShape(NotchShape(topCornerRadius: topRadius, bottomCornerRadius: bottomRadius))
+        }
+    }
+
+    private func resolvedBatteryNotificationStyle(for kind: BatteryTemporaryHUDKind) -> BatteryNotificationStyle {
+        switch kind {
+        case .charging:
+            return .compact
+        case .lowBattery:
+            return lowBatteryHUDStyle
+        case .fullBattery:
+            return fullBatteryHUDStyle
+        }
+    }
+
     /// Whether the notch/island should hide off-screen when closed on a non-notch display.
     /// Temporarily reveals the notch when a sneakPeek HUD or screenshot toast is active.
     private var shouldHideUntilHover: Bool {
@@ -332,6 +450,9 @@ struct ContentView: View {
     /// Resolves the clip/content shape per-screen: pill on non-notch screens
     /// when dynamic island mode is active, standard notch shape otherwise.
     private var resolvedClipShape: AnyShape {
+        if let activeClosedBatterySurfaceShape {
+            return activeClosedBatterySurfaceShape
+        }
         if isDynamicIslandMode {
             return AnyShape(currentPillShape)
         }
@@ -711,37 +832,32 @@ struct ContentView: View {
                               return false
                           }
                       }()
-                      let canShowMusicDuringExpansion = !coordinator.expandingView.show
-                          || coordinator.expandingView.type == .music
+                      let canShowMusicDuringExpansion = !isCurrentScreenExpansionVisible
+                          || currentScreenExpansionType == .music
                           || expansionMatchesSecondary
+                      let isAirPodsListeningModeSneak = coordinator.sneakPeek.type == .bluetoothAudio
+                          && coordinator.sneakPeek.value < 0
+                          && AirPodsListeningMode.fromHUDSymbol(coordinator.sneakPeek.icon) != nil
 
-                      if coordinator.expandingView.type == .battery && coordinator.expandingView.show && vm.notchState == .closed && Defaults[.showPowerStatusNotifications] {
-                        HStack(spacing: 0) {
-                            HStack {
-                                Text(batteryModel.statusText)
-                                    .font(.subheadline)
-                            }
-
-                            Rectangle()
-                                .fill(.black)
-                                .frame(width: vm.closedNotchSize.width + 10)
-
-                            HStack {
-                                DynamicIslandBatteryView(
-                                    batteryWidth: 30,
-                                    isCharging: batteryModel.isCharging,
-                                    isInLowPowerMode: batteryModel.isInLowPowerMode,
-                                    isPluggedIn: batteryModel.isPluggedIn,
-                                    levelBattery: batteryModel.levelBattery,
-                                    isForNotification: true
-                                )
-                            }
-                            .frame(width: 76, alignment: .trailing)
-                        }
-                        .frame(height: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0), alignment: .center)
+                      if currentScreenExpansionType == .battery
+                            && isBatteryHUDVisibleOnCurrentScreen
+                            && vm.notchState == .closed
+                            && Defaults[.showPowerStatusNotifications]
+                            && batteryModel.activeTemporaryHUDKind != nil {
+                        BatteryTemporaryActivityView(
+                            kind: batteryModel.activeTemporaryHUDKind ?? .charging,
+                            batteryLevel: displayedBatteryHUDLevel,
+                            isLowPowerMode: displayedBatteryHUDUsesLowPowerMode,
+                            closedNotchWidth: vm.closedNotchSize.width + (isHovering ? 8 : 0),
+                            baseHeight: vm.effectiveClosedNotchHeight + (isHovering ? 8 : 0),
+                            isDynamicIslandMode: isDynamicIslandMode,
+                            topCornerRadius: activeCornerRadiusInsets.closed.top,
+                            styleOverride: batteryModel.activeTemporaryHUDKind.map { resolvedBatteryNotificationStyle(for: $0) }
+                        )
+                        .id(batteryModel.activeTemporaryHUDToken)
                       } else if coordinator.expandingView.type == .screenshot && coordinator.expandingView.show && vm.notchState == .closed && Defaults[.enableScreenshotNotifications] {
                           ScreenshotClosedNotchNotification(isHovering: isHovering)
-                      } else if isSneakPeekVisibleOnCurrentScreen && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && (coordinator.sneakPeek.type != .reminder) && !coordinator.sneakPeek.type.isExtensionPayload && ((coordinator.sneakPeek.type != .volume && coordinator.sneakPeek.type != .brightness && coordinator.sneakPeek.type != .backlight) || vm.notchState == .closed) {
+                      } else if isSneakPeekVisibleOnCurrentScreen && (Defaults[.inlineHUD] || isAirPodsListeningModeSneak) && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && (coordinator.sneakPeek.type != .reminder) && !coordinator.sneakPeek.type.isExtensionPayload && ((coordinator.sneakPeek.type != .volume && coordinator.sneakPeek.type != .brightness && coordinator.sneakPeek.type != .backlight) || vm.notchState == .closed) {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(
                                   coordinator.sneakPeek.type == .capsLock
@@ -798,7 +914,7 @@ struct ContentView: View {
                        }
                       
                       if isSneakPeekVisibleOnCurrentScreen {
-                          if (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && (coordinator.sneakPeek.type != .reminder) && (coordinator.sneakPeek.type != .capsLock) && !coordinator.sneakPeek.type.isExtensionPayload && !Defaults[.inlineHUD] && ((coordinator.sneakPeek.type != .volume && coordinator.sneakPeek.type != .brightness && coordinator.sneakPeek.type != .backlight) || vm.notchState == .closed) {
+                          if (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && (coordinator.sneakPeek.type != .timer) && (coordinator.sneakPeek.type != .reminder) && (coordinator.sneakPeek.type != .capsLock) && !coordinator.sneakPeek.type.isExtensionPayload && !Defaults[.inlineHUD] && !isAirPodsListeningModeSneak && ((coordinator.sneakPeek.type != .volume && coordinator.sneakPeek.type != .brightness && coordinator.sneakPeek.type != .backlight) || vm.notchState == .closed) {
                               SystemEventIndicatorModifier(eventType: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, sendEventBack: { _ in
                                   //
                               })
@@ -901,6 +1017,8 @@ struct ContentView: View {
                                   NotchTimerView()
                               case .stats:
                                   NotchStatsView()
+                              case .llmUsage:
+                                  NotchLLMUsageView()
                               case .colorPicker:
                                   NotchColorPickerView()
                             case .notes:
@@ -1074,6 +1192,14 @@ struct ContentView: View {
                                 .foregroundStyle(timerManager.timerColor)
                                 .padding(.trailing, 8)
                                 .opacity((coordinator.expandingView.show && coordinator.expandingView.type == .timer && Defaults[.enableSneakPeek] && Defaults[.sneakPeekStyles] == .inline) ? 1 : 0)
+                        } else if Defaults[.showSongMetadataInClosedNotch] && isNonNotchScreen && !musicManager.songTitle.isEmpty {
+                            MarqueeText(
+                                .constant("\(musicManager.songTitle) • \(musicManager.artistName)"),
+                                textColor: Defaults[.coloredSpectrogram] ? Color(nsColor: musicManager.avgColor) : Color.gray,
+                                minDuration: 3,
+                                frameWidth: max(0, effectiveCenterWidth - 16)
+                            )
+                            .padding(.horizontal, 8)
                         }
                     }
                     .clipped()

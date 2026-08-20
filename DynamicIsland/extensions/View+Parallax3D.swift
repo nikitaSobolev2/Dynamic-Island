@@ -27,6 +27,7 @@ struct ParallaxMotionModifier: ViewModifier {
     var isSuspended: Bool
     
     @Default(.enableParallaxEffect) var enableParallaxEffect
+    @Default(.parallaxEffectIntensity) var parallaxEffectIntensity
     @State private var offset: CGSize = .zero
     @State private var isHovering = false
     @State private var viewSize: CGSize = .zero
@@ -69,11 +70,11 @@ struct ParallaxMotionModifier: ViewModifier {
                     }
                 }
                 .rotation3DEffect(
-                    .degrees(offset.height * magnitude), // Y movement rotates around X axis
+                    .degrees(offset.height * parallaxEffectIntensity), // Y movement rotates around X axis
                     axis: (x: 1, y: 0, z: 0)
                 )
                 .rotation3DEffect(
-                    .degrees(offset.width * -magnitude), // X movement rotates around Y axis (inverted to look naturally)
+                    .degrees(offset.width * -parallaxEffectIntensity), // X movement rotates around Y axis (inverted to look naturally)
                     axis: (x: 0, y: 1, z: 0)
                 )
                 .scaleEffect(isHovering ? 1.02 : 1.0) // Subtle scale up on hover

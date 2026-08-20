@@ -261,7 +261,7 @@ func getScreenFrame(_ screen: String? = nil) -> CGRect? {
 func getClosedNotchSize(screen: String? = nil) -> CGSize {
     // Default notch size, to avoid using optionals
     var notchHeight: CGFloat = Defaults[.nonNotchHeight]
-    var notchWidth: CGFloat = 185
+    var notchWidth: CGFloat = Defaults[.closedNotchWidth]
 
     var selectedScreen = NSScreen.main
 
@@ -276,6 +276,10 @@ func getClosedNotchSize(screen: String? = nil) -> CGSize {
            let topRightNotchpadding: CGFloat = screen.auxiliaryTopRightArea?.width
         {
             notchWidth = screen.frame.width - topLeftNotchpadding - topRightNotchpadding + 4
+
+            if Defaults[.customizePhysicalNotchWidth] {
+                notchWidth = Defaults[.closedNotchWidth]
+            }
         }
 
         // Check if the Mac has a notch

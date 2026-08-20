@@ -129,6 +129,8 @@ class MusicManager: ObservableObject {
 
     private var artworkData: Data? = nil
 
+    @Published var videoArtworkURL: URL? = nil
+
     private var liveStreamUnknownDurationCount: Int = 0
     private var liveStreamEdgeObservationCount: Int = 0
     private var liveStreamCompletionObservationCount: Int = 0
@@ -344,6 +346,11 @@ class MusicManager: ObservableObject {
         // Check for artwork changes
         let artworkChanged = state.artwork != nil && state.artwork != self.artworkData
         let hasContentChange = titleChanged || artistChanged || albumChanged || artworkChanged || bundleChanged
+        let liveArtworkChanged = state.liveArtworkURL != self.videoArtworkURL
+
+        if liveArtworkChanged {
+            self.videoArtworkURL = state.liveArtworkURL
+        }
 
         // Handle artwork and visual transitions for changed content
         let shouldAutoPeekOnTrackChange = Defaults[.showSneakPeekOnTrackChange]
@@ -367,6 +374,12 @@ class MusicManager: ObservableObject {
             self.lastArtworkArtist = state.artist
             self.lastArtworkAlbum = state.album
             self.lastArtworkBundleIdentifier = state.bundleIdentifier
+
+            if let liveArtworkURL = state.liveArtworkURL {
+                self.videoArtworkURL = liveArtworkURL
+            } else {
+                self.fetchVideoArtwork()
+            }
 
             // Fetch lyrics for new track whenever content changes
             self.fetchLyrics()
@@ -936,6 +949,28 @@ class MusicManager: ObservableObject {
     private func stopLyricSync() {
         lyricSyncTask?.cancel()
         lyricSyncTask = nil
+    }
+
+    func fetchVideoArtwork() {
+        guard Defaults[.lockScreenMusicFullscreenVideoArtwork] || Defaults[.showLiveCanvasInDynamicIsland] else {
+            videoArtworkURL = nil
+            return
+        }
+        guard bundleIdentifier == "com.apple.Music" else {
+            return
+        }
+
+        let title = songTitle
+        let artist = artistName
+
+        Task {
+            let url = await AnimatedArtworkManager.shared.fetchAnimatedArtworkURL(
+                title: title, artist: artist
+            )
+            await MainActor.run {
+                self.videoArtworkURL = url
+            }
+        }
     }
 
     func toggleLyrics() {

@@ -22,10 +22,12 @@ import Defaults
 struct NotchNotesView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
     @ObservedObject var coordinator = DynamicIslandViewCoordinator.shared
+    @ObservedObject private var appleNotesSync = AppleNotesSyncManager.shared
     @FocusState private var isFocused: Bool
     @Default(.savedNotes) var savedNotes
     @Default(.clipboardDisplayMode) var clipboardDisplayMode
     @Default(.enableClipboardManager) var enableClipboardManager
+    @Default(.enableAppleNotesSync) var enableAppleNotesSync
     
     @State private var selectedNoteId: UUID?
     @State private var isEditingNewNote = false
@@ -78,7 +80,8 @@ struct NotchNotesView: View {
                             onDeleteItem: deleteNoteItem,
                             onClearAll: clearAllNotes,
                             onTogglePin: togglePin,
-                            onCreateFromClipboard: createNoteFromClipboard
+                            onCreateFromClipboard: createNoteFromClipboard,
+                            onSync: syncWithAppleNotes
                         )
                         .transition(.asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .leading)))
                     }
@@ -101,6 +104,12 @@ struct NotchNotesView: View {
         .frame(maxHeight: .infinity)
         .onAppear {
             updateLayoutState()
+            syncWithAppleNotes()
+        }
+        .onChange(of: enableAppleNotesSync) { _, isEnabled in
+            if isEnabled {
+                syncWithAppleNotes()
+            }
         }
         .onDisappear {
             if isEditingNewNote || selectedNoteId != nil {
@@ -259,6 +268,7 @@ struct NotchNotesView: View {
         }
 
         savedNotes = notes
+        pushNoteToAppleNotes(noteId: id)
     }
 
     private func scheduleAutoSave() {
@@ -313,6 +323,7 @@ struct NotchNotesView: View {
         var notes = savedNotes
         for index in indexSet {
             if index < notes.count {
+                deleteRemoteNoteIfNeeded(notes[index])
                 if let fileName = notes[index].imageFileName {
                     let fileURL = NoteItem.noteImageDataDirectory.appendingPathComponent(fileName)
                     try? FileManager.default.removeItem(at: fileURL)
@@ -326,6 +337,7 @@ struct NotchNotesView: View {
     private func deleteNoteItem(_ note: NoteItem) {
         var notes = savedNotes
         if let index = notes.firstIndex(where: { $0.id == note.id }) {
+            deleteRemoteNoteIfNeeded(notes[index])
             // Clean up image file
             if let fileName = notes[index].imageFileName {
                 let fileURL = NoteItem.noteImageDataDirectory.appendingPathComponent(fileName)
@@ -339,12 +351,45 @@ struct NotchNotesView: View {
     private func clearAllNotes() {
         // Clean up all image files
         for note in savedNotes {
+            deleteRemoteNoteIfNeeded(note)
             if let fileName = note.imageFileName {
                 let fileURL = NoteItem.noteImageDataDirectory.appendingPathComponent(fileName)
                 try? FileManager.default.removeItem(at: fileURL)
             }
         }
         savedNotes.removeAll()
+    }
+
+    private func syncWithAppleNotes() {
+        guard enableAppleNotesSync else { return }
+        Task {
+            if let merged = await appleNotesSync.sync(localNotes: savedNotes) {
+                savedNotes = merged
+            }
+        }
+    }
+
+    private func pushNoteToAppleNotes(noteId: UUID) {
+        guard enableAppleNotesSync,
+              let note = savedNotes.first(where: { $0.id == noteId }) else { return }
+
+        Task {
+            if let updated = await appleNotesSync.pushNote(note),
+               let appleNotesId = updated.appleNotesId {
+                var notes = savedNotes
+                if let index = notes.firstIndex(where: { $0.id == noteId }) {
+                    notes[index].appleNotesId = appleNotesId
+                    savedNotes = notes
+                }
+            }
+        }
+    }
+
+    private func deleteRemoteNoteIfNeeded(_ note: NoteItem) {
+        guard enableAppleNotesSync, let appleNotesId = note.appleNotesId else { return }
+        Task {
+            await appleNotesSync.deleteRemoteNote(appleNotesId: appleNotesId)
+        }
     }
 
     private func cancelEdit() {
@@ -569,6 +614,7 @@ struct NotchClipboardItemRow: View {
 
 struct NoteListView: View {
     @EnvironmentObject var vm: DynamicIslandViewModel
+    @ObservedObject private var appleNotesSync = AppleNotesSyncManager.shared
     let notes: [NoteItem]
     let onSelect: (NoteItem) -> Void
     let onCreate: () -> Void
@@ -577,10 +623,12 @@ struct NoteListView: View {
     let onClearAll: () -> Void
     let onTogglePin: (NoteItem) -> Void
     let onCreateFromClipboard: () -> Void
+    let onSync: () -> Void
 
     @Default(.enableNoteSearch) var enableNoteSearch
     @Default(.enableNoteColorFiltering) var enableNoteColorFiltering
     @Default(.enableCreateFromClipboard) var enableCreateFromClipboard
+    @Default(.enableAppleNotesSync) var enableAppleNotesSync
     
     @State private var searchText = ""
     @State private var selectedColorFilter: Int? = nil
@@ -615,9 +663,37 @@ struct NoteListView: View {
                 Text("Notes")
                     .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
+
+                if enableAppleNotesSync {
+                    Image(systemName: appleNotesSync.isSyncing ? "arrow.triangle.2.circlepath" : "apple.logo")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(appleNotesSync.isSyncing ? .yellow : .white.opacity(0.45))
+                        .rotationEffect(.degrees(appleNotesSync.isSyncing ? 360 : 0))
+                        .animation(
+                            appleNotesSync.isSyncing
+                                ? .linear(duration: 1).repeatForever(autoreverses: false)
+                                : .default,
+                            value: appleNotesSync.isSyncing
+                        )
+                }
                 
                 Spacer()
-                
+
+                if enableAppleNotesSync {
+                    Button(action: onSync) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 13))
+                            .frame(width: 16, height: 16)
+                            .foregroundStyle(appleNotesSync.isSyncing ? .yellow : .white.opacity(0.6))
+                            .padding(5)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .disabled(appleNotesSync.isSyncing)
+                    .help(String(localized: "Sync with Apple Notes"))
+                }
+
                 if enableNoteSearch || enableNoteColorFiltering {
                     Button(action: { 
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {

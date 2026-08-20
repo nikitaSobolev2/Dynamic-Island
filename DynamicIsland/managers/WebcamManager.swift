@@ -21,7 +21,9 @@
  */
 
 import AVFoundation
+import Combine
 import SwiftUI
+import Defaults
 
 class WebcamManager: NSObject, ObservableObject {
     static let shared = WebcamManager()
@@ -51,7 +53,14 @@ class WebcamManager: NSObject, ObservableObject {
         }
     }
 
+    @Published var availableCameras: [AVCaptureDevice] = [] {
+        didSet {
+            objectWillChange.send()
+        }
+    }
+
     private let sessionQueue = DispatchQueue(label: "DynamicIsland.WebcamManager.SessionQueue", qos: .userInitiated)
+    private var cancellables = Set<AnyCancellable>()
     
     private var isCleaningUp: Bool = false
     
@@ -81,6 +90,18 @@ class WebcamManager: NSObject, ObservableObject {
         NotificationCenter.default.addObserver(self, selector: #selector(deviceWasDisconnected), name: .AVCaptureDeviceWasDisconnected, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(deviceWasConnected), name: .AVCaptureDeviceWasConnected, object: nil)
         checkCameraAvailability()
+        observeSelectedCameraChanges()
+    }
+
+    private func observeSelectedCameraChanges() {
+        Defaults.publisher(.selectedCameraID, options: [])
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, Defaults[.showMirror], self.isSessionRunning else { return }
+                self.stopSession()
+                self.startSession()
+            }
+            .store(in: &cancellables)
     }
     
     deinit {
@@ -132,14 +153,15 @@ class WebcamManager: NSObject, ObservableObject {
     /// Checks if any camera devices are available and sets up capture session if needed
     func checkCameraAvailability() {
         let availableDevices = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.external, .builtInWideAngleCamera],
+            deviceTypes: [.external, .builtInWideAngleCamera, .deskViewCamera, .externalUnknown],
             mediaType: .video,
             position: .unspecified
         ).devices
-        
+
         let hasAvailableDevices = !availableDevices.isEmpty
-        
+
         DispatchQueue.main.async {
+            self.availableCameras = availableDevices
             self.cameraAvailable = hasAvailableDevices
         }
     }
@@ -160,12 +182,22 @@ class WebcamManager: NSObject, ObservableObject {
             do {
                 // Get available devices and prefer external camera if available
                 let discoverySession = AVCaptureDevice.DiscoverySession(
-                    deviceTypes: [.external, .builtInWideAngleCamera],
+                    deviceTypes: [.external, .builtInWideAngleCamera, .deskViewCamera, .externalUnknown],
                     mediaType: .video,
                     position: .unspecified
                 )
-                
-                guard let videoDevice = discoverySession.devices.first else {
+
+                let devices = discoverySession.devices
+                let selectedID = Defaults[.selectedCameraID]
+
+                let videoDevice: AVCaptureDevice?
+                if !selectedID.isEmpty {
+                    videoDevice = devices.first(where: { $0.uniqueID == selectedID }) ?? devices.first
+                } else {
+                    videoDevice = devices.first
+                }
+
+                guard let videoDevice = videoDevice else {
                     NSLog("No video devices available")
                     DispatchQueue.main.async {
                         self.isSessionRunning = false
@@ -175,7 +207,7 @@ class WebcamManager: NSObject, ObservableObject {
                     return
                 }
                 
-                NSLog("Using camera: \(videoDevice.localizedName)")
+                NSLog("Using camera: \(videoDevice.localizedName) (ID: \(videoDevice.uniqueID))")
                 
                 // Lock device for configuration
                 try videoDevice.lockForConfiguration()
