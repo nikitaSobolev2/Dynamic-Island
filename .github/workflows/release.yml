@@ -169,8 +169,11 @@ jobs:
             echo "::error::Built app is $SHORT ($BUILD), expected ${{ steps.version.outputs.version }} (${{ steps.version.outputs.build_number }})"
             exit 1
           fi
-          chmod +x scripts/sign-release-app.sh
-          scripts/sign-release-app.sh \
+          if [ ! -f scripts/sign-release-app.sh ]; then
+            echo "::error::scripts/sign-release-app.sh is missing from the checkout"
+            exit 1
+          fi
+          bash scripts/sign-release-app.sh \
             --app "$APP_PATH" \
             --identity "${{ steps.signing.outputs.identity }}"
           mkdir -p build/export

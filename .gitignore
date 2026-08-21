@@ -145,7 +145,10 @@ PrivateWorks
 
 *.py
 *.sh
-!scripts/run-test.sh
+!scripts/*.sh
+!scripts/*.py
+__pycache__/
+*.pyc
 comparison_report.json
 *.txt
 ANIMATION_DEBUG_GUIDE.md
