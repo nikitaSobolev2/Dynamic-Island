@@ -1,6 +1,6 @@
 cask "dynamic-island" do
-  version "1.2.2"
-  sha256 "de280aad6cee38a184eba5e18c50ceb323ed35b9b0173171927c8e90023199bd"
+  version "1.3.1"
+  sha256 "b2b50ee3e75ba689b49c6fe9dc7a3c62748f2a37a3686ff4bc98b0b94f0d4240"
 
   url "https://github.com/nikitaSobolev2/Dynamic-Island/releases/download/v#{version}/DynamicIsland-#{version}.dmg"
   name "Dynamic Island"
