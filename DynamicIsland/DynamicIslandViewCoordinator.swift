@@ -112,10 +112,11 @@ class DynamicIslandViewCoordinator: ObservableObject {
     @Published var tabSwitchForward: Bool = true
     
     @Published var isHoverPreviewActive: Bool = false
+    @Published var isWindowSnapPaletteActive: Bool = false
 
     @Published var currentView: NotchViews = .home {
         didSet {
-            if (Defaults[.enableMinimalisticUI] || isHoverPreviewActive) && currentView != .home {
+            if (Defaults[.enableMinimalisticUI] || isHoverPreviewActive || isWindowSnapPaletteActive) && currentView != .home {
                 currentView = .home
                 return
             }

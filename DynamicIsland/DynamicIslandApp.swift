@@ -90,15 +90,29 @@ final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         true
     }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard WindowSnapManager.shared.shouldReceiveIslandHits(at: point, in: self) else {
+            return nil
+        }
+        return super.hitTest(point)
+    }
 }
 
 extension AppDelegate {
     static var shared: AppDelegate? {
-        NSApplication.shared.delegate as? AppDelegate
+        instance ?? (NSApplication.shared.delegate as? AppDelegate)
     }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    fileprivate static weak var instance: AppDelegate?
+
+    override init() {
+        super.init()
+        AppDelegate.instance = self
+    }
+
     var statusItem: NSStatusItem?
     var windows: [NSScreen: NSWindow] = [:]
     var viewModels: [NSScreen: DynamicIslandViewModel] = [:]
@@ -177,6 +191,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Cancel any pending window size updates
         windowSizeUpdateWorkItem?.cancel()
         NotificationCenter.default.removeObserver(self)
+        WindowSnapManager.shared.stop()
         extensionXPCServiceHost.stop()
         extensionRPCServer.stop()
 
@@ -537,6 +552,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Setup Privacy Indicator Manager (camera and microphone monitoring)
         PrivacyIndicatorManager.shared.startMonitoring()
+        WindowSnapManager.shared.start()
 
         if Defaults[.enableClipboardManager] {
             ClipboardManager.shared.startMonitoring()

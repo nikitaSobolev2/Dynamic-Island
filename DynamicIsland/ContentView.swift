@@ -54,6 +54,7 @@ struct ContentView: View {
     @ObservedObject var extensionLiveActivityManager = ExtensionLiveActivityManager.shared
     @ObservedObject var extensionNotchExperienceManager = ExtensionNotchExperienceManager.shared
     @ObservedObject var localSendService = LocalSendService.shared
+    @ObservedObject var windowSnapManager = WindowSnapManager.shared
     @State private var downloadManager = DownloadManager.shared
     
     @Default(.enableStatsFeature) var enableStatsFeature
@@ -414,6 +415,7 @@ struct ContentView: View {
             && vm.notchState == .closed
             && !isSneakPeekVisibleOnCurrentScreen
             && !isScreenshotNotificationVisible
+            && !windowSnapManager.shouldShowPalette(on: vm.screen)
     }
 
     private var isScreenshotNotificationVisible: Bool {
@@ -656,20 +658,20 @@ struct ContentView: View {
                         )
                     }
                 }
+                .onChange(of: windowSnapManager.isSessionActive) { _, isSnapping in
+                    if isSnapping {
+                        hoverTask?.cancel()
+                        stopHoverClickMonitor()
+                        vm.endHoverPreviewWithoutRestoringTab()
+                    }
+                }
+                .onChange(of: windowSnapManager.isPaletteVisible) { _, visible in
+                    updateWindowSnapPalettePresentation(visible)
+                }
                 .contextMenu {
                     Button("Settings") {
                         SettingsWindowController.shared.showWindow()
                     }
-//                    Button("Edit") { // Doesnt work....
-//                        let dn = DynamicNotch(content: EditPanelView())
-//                        dn.toggle()
-//                    }
-//                    #if DEBUG
-//                    .disabled(false)
-//                    #else
-//                    .disabled(true)
-//                    #endif
-//                    .keyboardShortcut("E", modifiers: .command)
                 }
 
         }
@@ -679,10 +681,13 @@ struct ContentView: View {
             alignment: .top
         )
         .animation(vm.notchState == .open ? hoverPreviewToFullAnimation : nil, value: vm.usesMinimalisticLayout)
+        .animation(.bouncy.speed(1.2), value: windowSnapManager.isPaletteVisible)
+        .animation(.spring(response: 0.42, dampingFraction: 0.8), value: windowSnapManager.highlightedRegion)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .environmentObject(privacyManager)
         .onChange(of: dynamicNotchSize) { oldSize, newSize in
             guard oldSize != newSize else { return }
+            guard !windowSnapManager.isHoldingIsland else { return }
             runAfter(0.1) {
                 vm.shouldRecheckHover.toggle()
             }
@@ -1022,6 +1027,15 @@ struct ContentView: View {
               
               ZStack {
                   if vm.notchState == .open {
+                      if windowSnapManager.shouldShowPalette(on: vm.screen) {
+                          WindowSnapPaletteView(highlightedRegion: windowSnapManager.highlightedRegion)
+                              .padding(.horizontal, 10)
+                              .padding(.bottom, 12)
+                              .transition(
+                                  .opacity
+                                      .combined(with: .scale(scale: 0.96, anchor: .top))
+                              )
+                      } else {
                       Group {
                           switch coordinator.currentView {
                               case .home:
@@ -1054,6 +1068,7 @@ struct ContentView: View {
                       }
                       .id(coordinator.currentView)
                       .transition(tabSwitchTransition)
+                      }
                   }
               }
               .zIndex(1)
@@ -1747,6 +1762,7 @@ struct ContentView: View {
     }
 
     private func openNotch() {
+        guard !windowSnapManager.isHoldingIsland else { return }
         if coordinator.isHoverPreviewActive {
             triggerHapticIfAllowed(ignoringCooldown: true)
         }
@@ -1764,13 +1780,35 @@ struct ContentView: View {
     }
 
     private func openHoverPreview() {
+        guard !windowSnapManager.isHoldingIsland else { return }
         vm.beginHoverPreview()
         withAnimation(.bouncy.speed(1.2)) {
             vm.open()
         }
     }
 
+    private func updateWindowSnapPalettePresentation(_ visible: Bool) {
+        if visible {
+            hoverTask?.cancel()
+            stopHoverClickMonitor()
+            vm.endHoverPreviewWithoutRestoringTab()
+            coordinator.isWindowSnapPaletteActive = true
+            coordinator.hideTransientNotchOverlays()
+            coordinator.currentView = .home
+            withAnimation(.bouncy.speed(1.2)) {
+                vm.open()
+            }
+            return
+        }
+        coordinator.isWindowSnapPaletteActive = false
+        guard vm.notchState == .open else { return }
+        withAnimation(.bouncy.speed(1.2)) {
+            vm.close()
+        }
+    }
+
     private func openNotchForHover() {
+        guard !windowSnapManager.isHoldingIsland else { return }
         if shouldOpenHoverPreview {
             openHoverPreview()
         } else {
@@ -1842,6 +1880,7 @@ struct ContentView: View {
         let handleClick: @Sendable () -> Void = { [weak vm, weak lockScreenManager] in
             Task { @MainActor in
                 guard let vm, let lockScreenManager else { return }
+                guard !self.windowSnapManager.isHoldingIsland else { return }
                 guard !lockScreenManager.isLocked else { return }
                 guard self.isHovering else { return }
                 let previewActive = self.coordinator.isHoverPreviewActive
@@ -1908,6 +1947,13 @@ struct ContentView: View {
     /// Handle hover state changes with debouncing
     private func handleHover(_ hovering: Bool) {
         hoverTask?.cancel()
+
+        if windowSnapManager.isHoldingIsland {
+            withAnimation(.bouncy.speed(1.2)) {
+                isHovering = hovering
+            }
+            return
+        }
 
         if hovering {
             startHoverClickMonitor()
@@ -2007,7 +2053,12 @@ struct ContentView: View {
     }
 
     private func shouldPreventAutoClose() -> Bool {
-        coordinator.firstLaunch || hasAnyActivePopovers() || vm.isAutoCloseSuppressed || SharingStateManager.shared.preventNotchClose || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
+        coordinator.firstLaunch
+            || hasAnyActivePopovers()
+            || vm.isAutoCloseSuppressed
+            || SharingStateManager.shared.preventNotchClose
+            || (Defaults[.terminalStickyMode] && coordinator.currentView == .terminal)
+            || windowSnapManager.isHoldingIsland
     }
     
     private func triggerHapticIfAllowed(ignoringCooldown: Bool = false) {

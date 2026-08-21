@@ -871,6 +871,7 @@ extension Defaults.Keys {
         default: .notch
     )
     static let hideNonNotchUntilHover = Key<Bool>("hideNonNotchUntilHover", default: false)
+    static let enableWindowSnap = Key<Bool>("enableWindowSnap", default: true)
     static let notchHeightMode = Key<WindowHeightMode>(
         "notchHeightMode",
         default: WindowHeightMode.matchRealNotchSize

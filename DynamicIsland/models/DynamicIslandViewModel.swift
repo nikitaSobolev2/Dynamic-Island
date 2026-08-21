@@ -110,10 +110,13 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
     private var tabBeforeHoverPreview: NotchViews?
 
     var usesMinimalisticLayout: Bool {
-        Defaults[.enableMinimalisticUI] || coordinator.isHoverPreviewActive
+        Defaults[.enableMinimalisticUI]
+            || coordinator.isHoverPreviewActive
+            || coordinator.isWindowSnapPaletteActive
     }
 
     func beginHoverPreview() {
+        guard !WindowSnapManager.shared.isHoldingIsland else { return }
         if !coordinator.isHoverPreviewActive {
             tabBeforeHoverPreview = coordinator.currentView
         }
@@ -147,6 +150,13 @@ class DynamicIslandViewModel: NSObject, ObservableObject {
         closedNotchSize = notchSize
 
         coordinator.$isHoverPreviewActive
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        coordinator.$isWindowSnapPaletteActive
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 self?.objectWillChange.send()

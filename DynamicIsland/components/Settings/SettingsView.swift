@@ -721,6 +721,7 @@ struct SettingsView: View {
             SettingsSearchEntry(tab: .general, title: "Hover preview delay", keywords: ["hover preview", "delay", "duration", "minimalistic"], highlightID: SettingsTab.general.highlightID(for: "Hover preview delay")),
             SettingsSearchEntry(tab: .general, title: "External display style", keywords: ["dynamic island", "pill", "external display", "non-notch", "floating", "capsule"], highlightID: SettingsTab.general.highlightID(for: "External display style")),
             SettingsSearchEntry(tab: .general, title: "Hide until hovered", keywords: ["hide", "hover", "external", "non-notch", "auto hide", "slide"], highlightID: SettingsTab.general.highlightID(for: "Hide until hovered")),
+            SettingsSearchEntry(tab: .general, title: "Window Snap", keywords: ["window", "snap", "tile", "half screen", "positions", "quarters"], highlightID: SettingsTab.general.highlightID(for: "Window Snap")),
             SettingsSearchEntry(tab: .general, title: "Notch display height", keywords: ["display height", "menu bar size"], highlightID: SettingsTab.general.highlightID(for: "Notch display height")),
 
             // Live Activities
@@ -1082,6 +1083,8 @@ struct GeneralSettings: View {
     @Default(.reverseScrollGestures) var reverseScrollGestures
     @Default(.externalDisplayStyle) var externalDisplayStyle
     @Default(.hideNonNotchUntilHover) var hideNonNotchUntilHover
+    @Default(.enableWindowSnap) var enableWindowSnap
+    @ObservedObject private var accessibilityPermission = AccessibilityPermissionStore.shared
 
     private func highlightID(_ title: String) -> String {
         SettingsTab.general.highlightID(for: title)
@@ -1229,6 +1232,8 @@ struct GeneralSettings: View {
             }
 
             NotchBehaviour()
+
+            windowSnapSettings()
 
             gestureControls()
         }
@@ -1381,6 +1386,32 @@ struct GeneralSettings: View {
                 .foregroundStyle(.secondary)
         } header: {
             Text("Notch behavior")
+        }
+    }
+
+    @ViewBuilder
+    func windowSnapSettings() -> some View {
+        if enableWindowSnap && !accessibilityPermission.isAuthorized {
+            Section {
+                SettingsPermissionCallout(
+                    message: "Accessibility permission lets Atoll place windows when you drop them on a snap region.",
+                    requestAction: { accessibilityPermission.requestAuthorizationPrompt() },
+                    openSettingsAction: { accessibilityPermission.openSystemSettings() }
+                )
+            } header: {
+                Text("Accessibility")
+            }
+        }
+
+        Section {
+            Defaults.Toggle(key: .enableWindowSnap) {
+                Text("Window Snap")
+            }
+            .settingsHighlight(id: highlightID("Window Snap"))
+        } header: {
+            Text("Window Snap")
+        } footer: {
+            Text("Drag a window onto the notch, then drop it on a region to resize and place it.")
         }
     }
 }

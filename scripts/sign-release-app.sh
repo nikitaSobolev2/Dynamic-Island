@@ -106,6 +106,15 @@ sign_sparkle() {
   sign_nested "$sparkle"
 }
 
+if [[ -d "$app_path/Contents/MacOS" ]]; then
+  # Debug ENABLE_DEBUG_DYLIB drops Atoll.debug.dylib / __preview.dylib next
+  # to the executable. Re-signing only the outer app leaves them ad-hoc, and
+  # dyld then rejects a Team ID mismatch under library validation.
+  for dylib in "$app_path/Contents/MacOS/"*.dylib; do
+    [[ -f "$dylib" ]] && sign_nested "$dylib"
+  done
+fi
+
 if [[ -d "$app_path/Contents/Frameworks" ]]; then
   for framework in "$app_path/Contents/Frameworks/"*.framework; do
     [[ -d "$framework" ]] || continue
