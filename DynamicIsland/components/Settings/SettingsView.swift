@@ -302,10 +302,10 @@ struct SettingsView: View {
     @StateObject private var highlightCoordinator = SettingsHighlightCoordinator()
     @Default(.enableMinimalisticUI) var enableMinimalisticUI
 
-    let updaterController: SPUStandardUpdaterController?
+    let updater: SPUUpdater?
 
-    init(updaterController: SPUStandardUpdaterController? = nil) {
-        self.updaterController = updaterController
+    init(updater: SPUUpdater? = nil) {
+        self.updater = updater
     }
 
     var body: some View {
@@ -1049,14 +1049,8 @@ struct SettingsView: View {
                 TerminalSettings()
             }
         case .about:
-            if let controller = updaterController {
-                SettingsForm(tab: .about) {
-                    About(updaterController: controller)
-                }
-            } else {
-                SettingsForm(tab: .about) {
-                    About(updaterController: SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil))
-                }
+            SettingsForm(tab: .about) {
+                About(updater: updater)
             }
         }
     }
@@ -3563,7 +3557,7 @@ struct CalendarSettings: View {
 
 struct About: View {
     @State private var showBuildNumber: Bool = false
-    let updaterController: SPUStandardUpdaterController
+    let updater: SPUUpdater?
     var body: some View {
         VStack {
             Form {
@@ -3587,7 +3581,9 @@ struct About: View {
                     Text("Version info")
                 }
 
-                UpdaterSettingsView(updater: updaterController.updater)
+                if let updater {
+                    UpdaterSettingsView(updater: updater)
+                }
 
                 Button {
                     NSWorkspace.shared.open(productPage)
@@ -3606,7 +3602,9 @@ struct About: View {
             }
         }
         .toolbar {
-            CheckForUpdatesView(updater: updaterController.updater)
+            if let updater {
+                CheckForUpdatesView(updater: updater)
+            }
         }
         .navigationTitle("About")
     }

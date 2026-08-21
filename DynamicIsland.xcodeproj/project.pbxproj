@@ -366,7 +366,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ \"$CONFIGURATION\" != \"Release\" ] || [ \"$ACTION\" != \"install\" ]; then\n\texit 0\nfi\n\nAPP=\"$CODESIGNING_FOLDER_PATH\"\nSPARKLE=\"$APP/Contents/Frameworks/Sparkle.framework\"\nXPC_DIR=\"$SPARKLE/Versions/Current/XPCServices\"\n\nif [ ! -d \"$XPC_DIR\" ]; then\n\texit 0\nfi\n\nfor xpc in \"$XPC_DIR\"/*.xpc; do\n\t/usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp --options runtime --preserve-metadata=identifier,entitlements \"$xpc\"\ndone\n\n/usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp --options runtime --preserve-metadata=identifier,entitlements \"$SPARKLE\"\n";
+			shellScript = "if [ \"$CONFIGURATION\" != \"Release\" ]; then\n\texit 0\nfi\n\nIDENTITY=\"${EXPANDED_CODE_SIGN_IDENTITY:-}\"\nif [ -z \"$IDENTITY\" ] || [ \"$IDENTITY\" = \"-\" ]; then\n\texit 0\nfi\n\nAPP=\"$CODESIGNING_FOLDER_PATH\"\nSPARKLE=\"$APP/Contents/Frameworks/Sparkle.framework\"\nCURRENT=\"$SPARKLE/Versions/Current\"\nif [ ! -d \"$SPARKLE\" ]; then\n\texit 0\nfi\n\nsign_nested() {\n\t/usr/bin/codesign --force --sign \"$IDENTITY\" --timestamp --options runtime --preserve-metadata=identifier,entitlements \"$1\"\n}\n\nif [ -d \"$CURRENT/XPCServices\" ]; then\n\tfor xpc in \"$CURRENT/XPCServices\"/*.xpc; do\n\t\t[ -e \"$xpc\" ] && sign_nested \"$xpc\"\n\tdone\nfi\n[ -d \"$CURRENT/Updater.app\" ] && sign_nested \"$CURRENT/Updater.app\"\n[ -x \"$CURRENT/Autoupdate\" ] && sign_nested \"$CURRENT/Autoupdate\"\nsign_nested \"$SPARKLE\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

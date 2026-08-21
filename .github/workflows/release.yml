@@ -49,6 +49,47 @@ jobs:
           printf '%s\n' "$SPARKLE_KEY" > "$RUNNER_TEMP/private_keys/sparkle_ed.key"
           chmod 600 "$RUNNER_TEMP/private_keys/sparkle_ed.key"
 
+      - name: Import Developer ID certificate
+        id: signing
+        env:
+          P12_BASE64: ${{ secrets.DEVELOPER_ID_APPLICATION_P12 }}
+          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_APPLICATION_P12_PASSWORD }}
+        run: |
+          if [ -z "${P12_BASE64:-}" ]; then
+            echo "No DEVELOPER_ID_APPLICATION_P12; using stable ad-hoc identity"
+            echo "identity=-" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/developer-id.p12"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/developer-id.p12" \
+            -P "$P12_PASSWORD" \
+            -A -t cert -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          IDENTITY="$(
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+              | sed -n 's/^[[:space:]]*[0-9]*)[[:space:]]*\([A-F0-9]\{40\}\)[[:space:]]*"Developer ID Application: .*"$/\1/p' \
+              | head -1
+          )"
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::P12 did not contain a Developer ID Application identity"
+            exit 1
+          fi
+          echo "identity=$IDENTITY" >> "$GITHUB_OUTPUT"
+          echo "Imported Developer ID $IDENTITY"
+
       - name: Resolve version
         id: version
         run: |
@@ -77,11 +118,13 @@ jobs:
           fi
 
           DMG_NAME="DynamicIsland-${VERSION}.dmg"
+          ZIP_NAME="DynamicIsland-${VERSION}.zip"
           {
             echo "tag=$TAG"
             echo "version=$VERSION"
             echo "build_number=$BUILD_NUMBER"
             echo "dmg_name=$DMG_NAME"
+            echo "zip_name=$ZIP_NAME"
           } >> "$GITHUB_OUTPUT"
           echo "Version ${VERSION} (build ${BUILD_NUMBER})"
 
@@ -89,11 +132,6 @@ jobs:
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
-
-      - name: Stamp version
-        run: |
-          xcrun agvtool new-marketing-version "${{ steps.version.outputs.version }}"
-          xcrun agvtool new-version -all "${{ steps.version.outputs.build_number }}"
 
       - name: Resolve packages
         run: |
@@ -107,6 +145,8 @@ jobs:
             -configuration Release \
             -destination 'platform=macOS' \
             -derivedDataPath build/DerivedData \
+            MARKETING_VERSION="${{ steps.version.outputs.version }}" \
+            CURRENT_PROJECT_VERSION="${{ steps.version.outputs.build_number }}" \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="" \
@@ -120,17 +160,27 @@ jobs:
           cp -n DynamicIsland/BluetoothHUDAnimations/*.mov "$DEST/"
           echo "Copied $(find "$DEST" -name '*.mov' | wc -l | tr -d ' ') HUD animations"
 
-      - name: Ad-hoc sign
+      - name: Sign release app
         run: |
           APP_PATH="build/DerivedData/Build/Products/Release/${APP_NAME}.app"
-          codesign --force --deep --sign - "$APP_PATH"
+          SHORT="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_PATH/Contents/Info.plist")"
+          BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP_PATH/Contents/Info.plist")"
+          if [ "$SHORT" != "${{ steps.version.outputs.version }}" ] || [ "$BUILD" != "${{ steps.version.outputs.build_number }}" ]; then
+            echo "::error::Built app is $SHORT ($BUILD), expected ${{ steps.version.outputs.version }} (${{ steps.version.outputs.build_number }})"
+            exit 1
+          fi
+          chmod +x scripts/sign-release-app.sh
+          scripts/sign-release-app.sh \
+            --app "$APP_PATH" \
+            --identity "${{ steps.signing.outputs.identity }}"
           mkdir -p build/export
           rm -rf "build/export/${APP_NAME}.app"
           cp -R "$APP_PATH" "build/export/${APP_NAME}.app"
 
-      - name: Create DMG
+      - name: Create DMG and Sparkle zip
         run: |
           DMG_NAME="${{ steps.version.outputs.dmg_name }}"
+          ZIP_NAME="${{ steps.version.outputs.zip_name }}"
           npx --yes create-dmg "build/export/${APP_NAME}.app" build/ --overwrite --no-code-sign
           GENERATED_DMG=$(find build -maxdepth 1 -name "*.dmg" | head -1)
           if [ -z "$GENERATED_DMG" ]; then
@@ -138,11 +188,12 @@ jobs:
             exit 1
           fi
           mv "$GENERATED_DMG" "build/${DMG_NAME}"
+          ditto -c -k --keepParent "build/export/${APP_NAME}.app" "build/${ZIP_NAME}"
 
       - name: Generate Sparkle appcast
         run: |
           TAG="${{ steps.version.outputs.tag }}"
-          DMG_NAME="${{ steps.version.outputs.dmg_name }}"
+          ZIP_NAME="${{ steps.version.outputs.zip_name }}"
           PREFIX="https://github.com/${{ github.repository }}/releases/download/${TAG}/"
 
           GENERATE_APPCAST=$(find ~/Library/Developer/Xcode/DerivedData build/DerivedData -name generate_appcast -type f 2>/dev/null | head -1)
@@ -158,8 +209,9 @@ jobs:
             exit 1
           fi
 
+          rm -rf "$HOME/Library/Caches/Sparkle_generate_appcast"
           mkdir -p build/appcast-staging
-          cp "build/${DMG_NAME}" build/appcast-staging/
+          cp "build/${ZIP_NAME}" build/appcast-staging/
           "$GENERATE_APPCAST" \
             --ed-key-file "$RUNNER_TEMP/private_keys/sparkle_ed.key" \
             --download-url-prefix "$PREFIX" \
@@ -169,6 +221,12 @@ jobs:
             echo "::error::generate_appcast did not write appcast.xml"
             exit 1
           fi
+
+          python3 scripts/sync-appcast-metadata.py \
+            --appcast build/appcast-staging/appcast.xml \
+            --version "${{ steps.version.outputs.version }}" \
+            --build "${{ steps.version.outputs.build_number }}" \
+            --enclosure-filename "$ZIP_NAME"
 
           python3 - <<'PY'
           from pathlib import Path
@@ -186,15 +244,17 @@ jobs:
           TAG="${{ steps.version.outputs.tag }}"
           VERSION="${{ steps.version.outputs.version }}"
           DMG_NAME="${{ steps.version.outputs.dmg_name }}"
+          ZIP_NAME="${{ steps.version.outputs.zip_name }}"
           cat > build/release_notes.md <<EOF
           ## Dynamic Island ${VERSION}
 
           Build ${{ steps.version.outputs.build_number }}.
 
-          This build is not notarized. After installing, clear Gatekeeper quarantine:
+          Homebrew installs strip Gatekeeper quarantine automatically. For a
+          manual DMG install:
 
           \`\`\`bash
-          xattr -cr /Applications/Atoll.app
+          xattr -dr com.apple.quarantine /Applications/Atoll.app
           \`\`\`
           EOF
 
@@ -202,6 +262,7 @@ jobs:
             --title "Dynamic Island ${VERSION}" \
             --notes-file build/release_notes.md \
             "build/${DMG_NAME}" \
+            "build/${ZIP_NAME}" \
             build/appcast-staging/appcast.xml
 
       - name: Publish appcast and Homebrew cask
@@ -242,4 +303,8 @@ jobs:
 
       - name: Cleanup secrets
         if: always()
-        run: rm -rf "$RUNNER_TEMP/private_keys"
+        run: |
+          rm -rf "$RUNNER_TEMP/private_keys" "$RUNNER_TEMP/developer-id.p12"
+          if [ -f "$RUNNER_TEMP/signing.keychain-db" ]; then
+            security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+          fi

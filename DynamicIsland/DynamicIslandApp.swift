@@ -20,7 +20,6 @@ import AVFoundation
 import Combine
 import Defaults
 import KeyboardShortcuts
-import Sparkle
 import SwiftUI
 import SkyLightWindow
 
@@ -30,17 +29,8 @@ struct DynamicNotchApp: App {
     @Default(.menubarIcon) var showMenuBarIcon
     @Environment(\.openWindow) var openWindow
 
-    let updaterController: SPUStandardUpdaterController
-
     init() {
-        updaterController = SPUStandardUpdaterController(
-            startingUpdater: true,
-            updaterDelegate: nil,
-            userDriverDelegate: nil)
-        updaterController.updater.automaticallyChecksForUpdates = true
-        updaterController.updater.automaticallyDownloadsUpdates = true
-
-        SettingsWindowController.shared.setUpdaterController(updaterController)
+        SettingsWindowController.shared.setUpdater(SoftwareUpdateController.shared.updater)
     }
 
     var body: some Scene {
@@ -48,7 +38,7 @@ struct DynamicNotchApp: App {
             Button("Settings") {
                 SettingsWindowController.shared.showWindow()
             }
-            CheckForUpdatesView(updater: updaterController.updater)
+            CheckForUpdatesView(updater: SoftwareUpdateController.shared.updater)
             Divider()
             Button("Restart Atoll") {
                 guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
@@ -515,6 +505,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         applySelectedAppIcon()
         installTopMenuItemsIfNeeded()
+
+        Task { @MainActor in
+            SoftwareUpdateController.shared.start()
+        }
 
         Defaults.publisher(.focusMonitoringMode, options: [])
             .sink { [weak self] _ in

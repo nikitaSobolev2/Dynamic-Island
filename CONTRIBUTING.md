@@ -83,16 +83,21 @@ We are committed to fostering a welcoming and inclusive environment. Please read
 
 ## Releasing
 
-Push a version tag to build and publish a GitHub Release. Sparkle and Homebrew then follow that release. Builds are ad-hoc signed (not notarized); users clear quarantine with `xattr -cr /Applications/Atoll.app`.
+Push a version tag to build and publish a GitHub Release. Sparkle and Homebrew then follow that release. Builds are not notarized.
 
 ```bash
 git tag v2.2.0
 git push origin v2.2.0
 ```
 
-The app always updates from the latest GitHub Release via `Updates/appcast.xml`. There is no beta/nightly channel.
+The app updates from the latest GitHub Release via `https://github.com/nikitaSobolev2/Dynamic-Island/releases/latest/download/appcast.xml`. There is no beta/nightly channel.
 
-The only repository secret required is `SPARKLE_ED_PRIVATE_KEY` (EdDSA private key matching `SUPublicEDKey` in `DynamicIsland/Info.plist`). Never commit it.
+Repository secrets:
+
+- `SPARKLE_ED_PRIVATE_KEY` (required) — EdDSA private key matching `SUPublicEDKey` in `DynamicIsland/Info.plist`. Never commit it.
+- `DEVELOPER_ID_APPLICATION_P12` (optional, base64-encoded PKCS#12) and `DEVELOPER_ID_APPLICATION_P12_PASSWORD` — sign releases with Developer ID so Accessibility and related TCC grants survive Homebrew upgrades.
+
+Without a Developer ID, CI uses an ad-hoc signature whose designated requirement is only the bundle identifier, which still keeps TCC grants across consecutive cask upgrades. Homebrew strips Gatekeeper quarantine in the cask `postflight`.
 
 ## Code review process
 - All pull requests require review from project maintainers before merging.

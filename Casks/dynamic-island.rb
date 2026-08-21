@@ -17,10 +17,18 @@ cask "dynamic-island" do
 
   app "Atoll.app"
 
-  caveats <<~EOS
-    This build is not notarized. After installing, clear Gatekeeper quarantine:
+  uninstall quit: "com.Ebullioscopic.Atoll"
 
-      xattr -cr #{appdir}/Atoll.app
+  postflight do
+    system_command "/usr/bin/xattr",
+                   args: ["-dr", "com.apple.quarantine", "#{appdir}/Atoll.app"],
+                   must_succeed: false
+  end
+
+  caveats <<~EOS
+    This build is not notarized. Homebrew removes the quarantine flag after
+    install. Accessibility and related permissions persist across upgrades when
+    consecutive builds share the same code-signing identity.
   EOS
 
   zap trash: [

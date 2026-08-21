@@ -14,11 +14,11 @@
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUEnableDownloaderService</key>
-	<true/>
+	<false/>
 	<key>SUEnableInstallerLauncherService</key>
-	<true/>
+	<false/>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/nikitaSobolev2/Dynamic-Island/main/Updates/appcast.xml</string>
+	<string>https://github.com/nikitaSobolev2/Dynamic-Island/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>s2IhIl7jraXn9GBL7CQ2fnsIhl8k6aLwjC0ZIaTaVb4=</string>
 	<key>UTImportedTypeDeclarations</key>

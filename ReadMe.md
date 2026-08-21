@@ -62,7 +62,6 @@ Builds are not notarized. After installing, macOS may block the app until you re
 ```bash
 brew tap nikitaSobolev2/dynamic-island https://github.com/nikitaSobolev2/Dynamic-Island
 brew install --cask dynamic-island
-xattr -cr /Applications/Atoll.app
 ```
 
 ### GitHub Release
@@ -72,7 +71,7 @@ xattr -cr /Applications/Atoll.app
 3. Clear Gatekeeper quarantine, then launch Atoll:
 
 ```bash
-xattr -cr /Applications/Atoll.app
+xattr -dr com.apple.quarantine /Applications/Atoll.app
 ```
 
 ### Build from source

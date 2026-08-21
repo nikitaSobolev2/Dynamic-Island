@@ -47,19 +47,13 @@ xcodebuild \
 # xcodebuild stays ad-hoc so the project team does not have to match this
 # machine. Re-sign with Apple Development so TCC (Accessibility, Screen
 # Recording, Full Disk Access) is keyed by Team ID + bundle id and survives
-# rebuilds. Deep-sign so Lottie/Sparkle share that team under hardened runtime.
+# rebuilds. Sign nested Sparkle helpers individually — never --deep.
 if [[ -n "$codesign_identity" ]]; then
   echo "Re-signing with Apple Development ($codesign_identity)"
-  codesign \
-    --force \
-    --deep \
-    --sign "$codesign_identity" \
-    --options runtime \
-    --preserve-metadata=identifier,entitlements \
-    "$app_path"
+  "$root_dir/scripts/sign-release-app.sh" --app "$app_path" --identity "$codesign_identity"
 else
   echo "No Apple Development identity found; ad-hoc fallback (permissions will reset each run)" >&2
-  codesign --force --deep --sign - "$app_path"
+  "$root_dir/scripts/sign-release-app.sh" --app "$app_path" --identity -
 fi
 
 xattr -cr "$app_path" || true
