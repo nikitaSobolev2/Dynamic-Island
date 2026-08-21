@@ -4,11 +4,11 @@
         <title>Dynamic Island</title>
         <item>
             <title>1.0.0</title>
-            <pubDate>Thu, 20 Aug 2026 15:58:48 +0000</pubDate>
-            <sparkle:version>12</sparkle:version>
+            <pubDate>Fri, 21 Aug 2026 05:14:23 +0000</pubDate>
+            <sparkle:version>13</sparkle:version>
             <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.6</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/nikitaSobolev2/Dynamic-Island/releases/download/v1.1.0/DynamicIsland-1.1.0.dmg" length="21406750" type="application/octet-stream" sparkle:edSignature="T7b+NyyZ6dVzuXVMfqTpqzAYn4EV1kypPVUKfxpJLm0L55/yURfKI8inN5hamtNgBokQzZri0jsXbevB7+iAAg=="/>
+            <enclosure url="https://github.com/nikitaSobolev2/Dynamic-Island/releases/download/v1.2.0/DynamicIsland-1.2.0.dmg" length="21505267" type="application/octet-stream" sparkle:edSignature="PSh55rMBq2O2FuP6OdQAXKi5PW3qLxWzPFi1iTYWrgv3kPraZnt5R1cVd+tbcSvSpSpYmiOWn0XNnxw2r6d2Cw=="/>
         </item>
     </channel>
 </rss>
