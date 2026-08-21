@@ -92,7 +92,10 @@ final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
-        guard WindowSnapManager.shared.shouldReceiveIslandHits(at: point, in: self) else {
+        let allowHits = MainActor.assumeIsolated {
+            WindowSnapManager.shared.shouldReceiveIslandHits(at: point, in: self)
+        }
+        guard allowHits else {
             return nil
         }
         return super.hitTest(point)
@@ -404,7 +407,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             isStatsTabActive: coordinator.currentView == .stats,
             secondRowProgress: coordinator.statsSecondRowExpansion
         )
-        var result = addShadowPadding(
+        let result = addShadowPadding(
             to: adjustedContentSize,
             isMinimalistic: vm.usesMinimalisticLayout
         )

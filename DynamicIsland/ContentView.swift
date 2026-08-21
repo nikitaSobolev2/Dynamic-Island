@@ -474,48 +474,78 @@ struct ContentView: View {
         return AnyShape(currentNotchShape)
     }
 
+    private var interactionsEnabled: Bool {
+        !lockScreenManager.isLocked
+    }
+
+    private var notchHorizontalPadding: CGFloat {
+        guard vm.notchState == .open else {
+            return activeCornerRadiusInsets.closed.bottom
+        }
+        if Defaults[.cornerRadiusScaling] {
+            return activeCornerRadiusInsets.opened.top - 5
+        }
+        return activeCornerRadiusInsets.opened.bottom - 5
+    }
+
+    private var hoverAreaPadding: CGFloat {
+        if vm.notchState == .open && Defaults[.extendHoverArea] {
+            return 0
+        }
+        return vm.effectiveClosedNotchHeight == 0 ? zeroHeightHoverPadding : 0
+    }
+
+    private var notchBottomPadding: CGFloat {
+        currentShadowPadding + hoverAreaPadding
+    }
+
+    private var pillTopOffset: CGFloat {
+        isDynamicIslandMode ? dynamicIslandTopOffset : 0
+    }
+
     var body: some View {
-        let interactionsEnabled = !lockScreenManager.isLocked
-        let isIslandMode = isDynamicIslandMode
-        let notchHorizontalPadding: CGFloat = {
-            guard vm.notchState == .open else {
-                return activeCornerRadiusInsets.closed.bottom
-            }
-            if Defaults[.cornerRadiusScaling] {
-                return activeCornerRadiusInsets.opened.top - 5
-            }
-            return activeCornerRadiusInsets.opened.bottom - 5
-        }()
-        let hoverAreaPadding: CGFloat = {
-            if vm.notchState == .open && Defaults[.extendHoverArea] {
-                return 0
-            }
-            return vm.effectiveClosedNotchHeight == 0 ? zeroHeightHoverPadding : 0
-        }()
-        let notchBottomPadding = currentShadowPadding + hoverAreaPadding
-        // Extra top padding to detach pill from screen edge in Dynamic Island mode
-        let pillTopOffset: CGFloat = isIslandMode ? dynamicIslandTopOffset : 0
+        withIslandLifecycle(islandSized)
+    }
 
+    private var islandSized: some View {
+        islandChrome
+            .frame(
+                maxWidth: dynamicNotchSize.width + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0),
+                maxHeight: dynamicNotchSize.height + currentShadowPadding + (isDynamicIslandMode ? dynamicIslandTopOffset : 0),
+                alignment: .top
+            )
+            .animation(vm.notchState == .open ? hoverPreviewToFullAnimation : nil, value: vm.usesMinimalisticLayout)
+            .animation(.bouncy.speed(1.2), value: windowSnapManager.isPaletteVisible)
+            .animation(.spring(response: 0.42, dampingFraction: 0.8), value: windowSnapManager.highlightedRegion)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private var islandChrome: some View {
         ZStack(alignment: .top) {
-            let mainLayout = NotchLayout()
-                .frame(alignment: .top)
-                .padding(.horizontal, notchHorizontalPadding)
-                .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-                .background(.black)
-                .clipShape(resolvedClipShape)
-                .compositingGroup()
-                .shadow(
-                    color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
-                        ? .black.opacity(0.6)
-                        : .clear,
-                    radius: Defaults[.cornerRadiusScaling] ? 10 : 5
-                )
-                // Extra horizontal inset for Dynamic Island mode so the shadow
-                // is not clipped by the outer frame constraint
-                .padding(.horizontal, isIslandMode ? dynamicIslandShadowInset : 0)
-                .padding(.top, pillTopOffset)
+            withIslandChromeLifecycle(withIslandChromeInteractions(notchSurface))
+        }
+    }
 
-            mainLayout
+    private var notchSurface: some View {
+        NotchLayout()
+            .frame(alignment: .top)
+            .padding(.horizontal, notchHorizontalPadding)
+            .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
+            .background(.black)
+            .clipShape(resolvedClipShape)
+            .compositingGroup()
+            .shadow(
+                color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
+                    ? .black.opacity(0.6)
+                    : .clear,
+                radius: Defaults[.cornerRadiusScaling] ? 10 : 5
+            )
+            .padding(.horizontal, isDynamicIslandMode ? dynamicIslandShadowInset : 0)
+            .padding(.top, pillTopOffset)
+    }
+
+    private func withIslandChromeInteractions<Content: View>(_ view: Content) -> some View {
+        view
                 .conditionalModifier(!useModernCloseAnimation) { view in
                     let hoverAnimation = Animation.bouncy.speed(1.2)
                     let notchStateAnimation = Animation.spring.speed(1.2)
@@ -575,6 +605,10 @@ struct ContentView: View {
                     ? -(vm.closedNotchSize.height + pillTopOffset + currentShadowPadding + 10)
                     : 0
                 )
+    }
+
+    private func withIslandChromeLifecycle<Content: View>(_ view: Content) -> some View {
+        view
                 .onAppear(perform: {
                     if coordinator.firstLaunch {
                         // Single open during first launch; closeHello() handles the timed close.
@@ -673,17 +707,10 @@ struct ContentView: View {
                         SettingsWindowController.shared.showWindow()
                     }
                 }
+    }
 
-        }
-        .frame(
-            maxWidth: dynamicNotchSize.width + (isDynamicIslandMode ? dynamicIslandShadowInset * 2 : 0),
-            maxHeight: dynamicNotchSize.height + currentShadowPadding + (isDynamicIslandMode ? dynamicIslandTopOffset : 0),
-            alignment: .top
-        )
-        .animation(vm.notchState == .open ? hoverPreviewToFullAnimation : nil, value: vm.usesMinimalisticLayout)
-        .animation(.bouncy.speed(1.2), value: windowSnapManager.isPaletteVisible)
-        .animation(.spring(response: 0.42, dampingFraction: 0.8), value: windowSnapManager.highlightedRegion)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    private func withIslandLifecycle<Content: View>(_ view: Content) -> some View {
+        view
         .environmentObject(privacyManager)
         .onChange(of: dynamicNotchSize) { oldSize, newSize in
             guard oldSize != newSize else { return }
@@ -1027,48 +1054,7 @@ struct ContentView: View {
               
               ZStack {
                   if vm.notchState == .open {
-                      if windowSnapManager.shouldShowPalette(on: vm.screen) {
-                          WindowSnapPaletteView(highlightedRegion: windowSnapManager.highlightedRegion)
-                              .padding(.horizontal, 10)
-                              .padding(.bottom, 12)
-                              .transition(
-                                  .opacity
-                                      .combined(with: .scale(scale: 0.96, anchor: .top))
-                              )
-                      } else {
-                      Group {
-                          switch coordinator.currentView {
-                              case .home:
-                                  NotchHomeView(albumArtNamespace: albumArtNamespace)
-                              case .shelf:
-                                  NotchShelfView()
-                              case .timer:
-                                  NotchTimerView()
-                              case .stats:
-                                  NotchStatsView()
-                              case .llmUsage:
-                                  NotchLLMUsageView()
-                              case .colorPicker:
-                                  NotchColorPickerView()
-                            case .notes:
-                                NotchNotesView()
-                            case .clipboard:
-                                NotchNotesView()
-                            case .promptStash:
-                                NotchPromptStashView()
-                            case .terminal:
-                                NotchTerminalView()
-                            case .extensionExperience:
-                                if let payload = currentExtensionTabPayload() {
-                                    ExtensionNotchExperienceTabView(payload: payload)
-                                } else {
-                                    NotchHomeView(albumArtNamespace: albumArtNamespace)
-                                }
-                          }
-                      }
-                      .id(coordinator.currentView)
-                      .transition(tabSwitchTransition)
-                      }
+                      openIslandPage
                   }
               }
               .zIndex(1)
@@ -1078,6 +1064,52 @@ struct ContentView: View {
               .animation(.smooth(duration: 0.3), value: coordinator.currentView)
           }
       }
+
+    @ViewBuilder
+    private var openIslandPage: some View {
+        if windowSnapManager.shouldShowPalette(on: vm.screen) {
+            WindowSnapPaletteView(highlightedRegion: windowSnapManager.highlightedRegion)
+                .padding(.horizontal, 10)
+                .padding(.bottom, 12)
+                .transition(
+                    .opacity
+                        .combined(with: .scale(scale: 0.96, anchor: .top))
+                )
+        } else {
+            Group {
+                switch coordinator.currentView {
+                case .home:
+                    NotchHomeView(albumArtNamespace: albumArtNamespace)
+                case .shelf:
+                    NotchShelfView()
+                case .timer:
+                    NotchTimerView()
+                case .stats:
+                    NotchStatsView()
+                case .llmUsage:
+                    NotchLLMUsageView()
+                case .colorPicker:
+                    NotchColorPickerView()
+                case .notes:
+                    NotchNotesView()
+                case .clipboard:
+                    NotchNotesView()
+                case .promptStash:
+                    NotchPromptStashView()
+                case .terminal:
+                    NotchTerminalView()
+                case .extensionExperience:
+                    if let payload = currentExtensionTabPayload() {
+                        ExtensionNotchExperienceTabView(payload: payload)
+                    } else {
+                        NotchHomeView(albumArtNamespace: albumArtNamespace)
+                    }
+                }
+            }
+            .id(coordinator.currentView)
+            .transition(tabSwitchTransition)
+        }
+    }
 
     private func reminderColor(for reminder: ReminderLiveActivityManager.ReminderEntry, now: Date) -> Color {
         if isReminderCritical(reminder, now: now) {
