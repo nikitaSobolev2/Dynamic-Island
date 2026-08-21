@@ -95,6 +95,15 @@ final class VoiceChatTests: XCTestCase {
         XCTAssertFalse(VoiceChatManager.shouldShowControls(microphoneActive: false))
     }
 
+    func testHeaderControlsOnlyNeedFeatureEnabled() {
+        XCTAssertTrue(VoiceChatManager.shouldShowHeaderControls())
+
+        Defaults[.enableVoiceChatControls] = false
+
+        XCTAssertFalse(VoiceChatManager.shouldShowHeaderControls())
+        XCTAssertFalse(VoiceChatManager.shouldShowControls(microphoneActive: true))
+    }
+
     func testMuteToggleUpdatesPublishedState() {
         let input = FakeAudioMuteStore()
         let output = FakeAudioMuteStore()

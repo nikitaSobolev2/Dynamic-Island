@@ -28,8 +28,6 @@ struct DynamicIslandHeader: View {
     @ObservedObject var shelfState = ShelfStateViewModel.shared
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var doNotDisturbManager = DoNotDisturbManager.shared
-    @ObservedObject var voiceChatManager = VoiceChatManager.shared
-    @ObservedObject var privacyManager = PrivacyIndicatorManager.shared
     @State private var showClipboardPopover = false
     @State private var showColorPickerPopover = false
     @State private var showTimerPopover = false
@@ -40,6 +38,7 @@ struct DynamicIslandHeader: View {
     @Default(.showBatteryIndicator) var showBatteryIndicator
     @Default(.showBatteryPercentInside) var showBatteryPercentInside
     @Default(.showMinimalisticBatteryIndicator) var showMinimalisticBatteryIndicator
+    @Default(.enableVoiceChatControls) var enableVoiceChatControls
     
     var body: some View {
         ZStack {
@@ -73,6 +72,10 @@ struct DynamicIslandHeader: View {
 
                 HStack(spacing: 4) {
                     if vm.notchState == .open && !vm.usesMinimalisticLayout {
+                    if enableVoiceChatControls {
+                        VoiceChatHeaderControls(style: .capsule)
+                    }
+
                     if Defaults[.showMirror] {
                         Button(action: {
                             vm.toggleCameraPreview()
@@ -335,8 +338,7 @@ private extension DynamicIslandHeader {
     var shouldShowMinimalisticVoiceControls: Bool {
         vm.notchState == .open
             && vm.usesMinimalisticLayout
-            && (voiceChatManager.isSessionActive
-                || VoiceChatManager.shouldShowControls(microphoneActive: privacyManager.microphoneActive))
+            && enableVoiceChatControls
     }
 }
 

@@ -4184,7 +4184,6 @@ struct LiveActivitiesSettings: View {
                 Defaults.Toggle(key: .enableVoiceChatControls) {
                     Text("Enable Voice Chat Controls")
                 }
-                .disabled(!enableMicrophoneDetection)
                 .settingsHighlight(id: highlightID("Enable Voice Chat Controls"))
 
                 HStack {
@@ -4203,7 +4202,7 @@ struct LiveActivitiesSettings: View {
             } header: {
                 Text("Voice Chat Controls")
             } footer: {
-                Text("Mutes this Mac’s microphone and speakers, not Discord/Meet’s own mute.")
+                Text("Always shows microphone and speaker mute in the hover island and the full island header. Mutes this Mac’s microphone and speakers, not Discord/Meet’s own mute.")
             }
 
             Section {

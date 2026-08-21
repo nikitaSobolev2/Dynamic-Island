@@ -49,22 +49,30 @@ struct VoiceChatControlRow: View {
 }
 
 struct VoiceChatHeaderControls: View {
+    enum Style {
+        case compact
+        case capsule
+    }
+
     @ObservedObject var manager = VoiceChatManager.shared
+    var style: Style = .compact
 
     var body: some View {
-        HStack(spacing: 2) {
-            VoiceChatGlyph(
+        HStack(spacing: style == .capsule ? 4 : 2) {
+            control(
                 systemName: manager.isMicrophoneMuted ? "mic.slash.fill" : "mic.fill",
                 color: manager.isMicrophoneMuted ? Color.white.opacity(0.55) : voiceChatMicrophoneOrange,
-                isEnabled: manager.isMicrophoneMuteAvailable
+                isEnabled: manager.isMicrophoneMuteAvailable,
+                help: "Mute microphone"
             ) {
                 manager.toggleMicrophoneMute()
             }
 
-            VoiceChatGlyph(
+            control(
                 systemName: manager.isOutputMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
                 color: manager.isOutputMuted ? Color.white.opacity(0.55) : .white,
-                isEnabled: true
+                isEnabled: true,
+                help: "Mute speakers"
             ) {
                 manager.toggleOutputMute()
             }
@@ -72,6 +80,62 @@ struct VoiceChatHeaderControls: View {
         .onAppear {
             manager.refreshSession()
         }
+    }
+
+    @ViewBuilder
+    private func control(
+        systemName: String,
+        color: Color,
+        isEnabled: Bool,
+        help: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        switch style {
+        case .compact:
+            VoiceChatGlyph(
+                systemName: systemName,
+                color: color,
+                isEnabled: isEnabled,
+                action: action
+            )
+        case .capsule:
+            VoiceChatHeaderCapsuleButton(
+                systemName: systemName,
+                color: color,
+                isEnabled: isEnabled,
+                help: help,
+                action: action
+            )
+        }
+    }
+}
+
+private struct VoiceChatHeaderCapsuleButton: View {
+    let systemName: String
+    let color: Color
+    let isEnabled: Bool
+    let help: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: {
+            guard isEnabled else { return }
+            action()
+        }) {
+            Capsule()
+                .fill(.black)
+                .frame(width: 30, height: 30)
+                .overlay {
+                    Image(systemName: systemName)
+                        .foregroundColor(color)
+                        .imageScale(.medium)
+                }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.35)
+        .help(help)
+        .accessibilityLabel(help)
     }
 }
 

@@ -83,6 +83,10 @@ final class VoiceChatManager: ObservableObject {
             && microphoneActive
     }
 
+    static func shouldShowHeaderControls() -> Bool {
+        Defaults[.enableVoiceChatControls]
+    }
+
     private func applySession(microphoneActive: Bool) {
         isSessionActive = Self.shouldShowControls(microphoneActive: microphoneActive)
         refreshMuteState()
@@ -90,7 +94,6 @@ final class VoiceChatManager: ObservableObject {
 
     private func bindPublishers(microphoneActivePublisher: AnyPublisher<Bool, Never>) {
         microphoneActivePublisher
-            .receive(on: DispatchQueue.main)
             .sink { [weak self] isActive in
                 self?.applySession(microphoneActive: isActive)
             }
